@@ -162,16 +162,20 @@ class SpeechManager {
         this.synthesis = (typeof window !== 'undefined' && 'speechSynthesis' in window) ? window.speechSynthesis : null;
         this.isListening = false;
         this.isSpeaking = false;
-        this.currentUtterance = null;
         this.voices = [];
         this.selectedVoice = null;
         this.isInitialized = false;
         this.unsupportedReason = '';
         this.lastError = '';
-        // Detección de iOS/Safari
+        // Detección de iOS/Safari mejorada
         this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         this.isIOSSafari = this.isIOS && this.isSafari;
+        
+        // Detección específica de iPhone 16 (problema de micrófono)
+        this.isiPhone16 = /iPhone16/.test(navigator.userAgent) || (this.isIOS && navigator.userAgent.includes('16_'));
+        this.isiPhone17Pro = /iPhone17/.test(navigator.userAgent) || (this.isIOS && navigator.userAgent.includes('17_'));
+        
         // Fallback para iOS
         this.mediaRecorder = null;
         this.audioChunks = [];
@@ -189,6 +193,8 @@ class SpeechManager {
                 isIOS: this.isIOS,
                 isSafari: this.isSafari,
                 isIOSSafari: this.isIOSSafari,
+                isiPhone16: this.isiPhone16,
+                isiPhone17Pro: this.isiPhone17Pro,
                 isSecureContext: window.isSecureContext,
                 protocol: window.location.protocol,
                 userAgent: navigator.userAgent
@@ -216,15 +222,33 @@ class SpeechManager {
             // Solicitar permiso de micrófono explícito con timeout para iOS
             try {
                 console.log('🎤 Solicitando permisos de micrófono...');
-                const constraints = this.isIOSSafari ? {
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        sampleRate: { ideal: 16000 },
-                        channelCount: { ideal: 1 }
-                    }
-                } : { audio: true };
+                
+                // Configuración específica para iPhone 16 (problemas de micrófono)
+                let constraints;
+                if (this.isiPhone16) {
+                    console.log('📱 Configuración específica para iPhone 16...');
+                    constraints = {
+                        audio: {
+                            echoCancellation: false, // Desactivar para iPhone 16
+                            noiseSuppression: false, // Desactivar para iPhone 16
+                            autoGainControl: true,
+                            sampleRate: { ideal: 44100 }, // Frecuencia más alta para iPhone 16
+                            channelCount: { ideal: 1 }
+                        }
+                    };
+                } else if (this.isIOSSafari) {
+                    constraints = {
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                            sampleRate: { ideal: 16000 },
+                            channelCount: { ideal: 1 }
+                        }
+                    };
+                } else {
+                    constraints = { audio: true };
+                }
 
                 const permissionTimeout = new Promise((_, reject) => {
                     setTimeout(() => reject(new Error('Timeout solicitando permisos')), 10000);
@@ -300,15 +324,29 @@ class SpeechManager {
             }
 
             // Solicitar permisos específicos para iOS con timeout
-            const constraints = {
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: { ideal: 16000 },
-                    channelCount: { ideal: 1 }
-                }
-            };
+            let constraints;
+            if (this.isiPhone16) {
+                console.log('📱 Fallback específico para iPhone 16...');
+                constraints = {
+                    audio: {
+                        echoCancellation: false, // Desactivar para iPhone 16
+                        noiseSuppression: false, // Desactivar para iPhone 16
+                        autoGainControl: true,
+                        sampleRate: { ideal: 44100 }, // Frecuencia más alta
+                        channelCount: { ideal: 1 }
+                    }
+                };
+            } else {
+                constraints = {
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: { ideal: 16000 },
+                        channelCount: { ideal: 1 }
+                    }
+                };
+            }
 
             const permissionTimeout = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('Timeout solicitando permisos')), 10000);
@@ -964,7 +1002,7 @@ class SpeechManager {
     }
 
     async speakIOS(text) {
-        console.log('🍎📱 Iniciando síntesis de voz en iOS Safari:', text.substring(0, 50) + '...');
+        console.log('🍎📱 Iniciando síntesis de voz en iOS Safari (iPhone 17 Pro):', text.substring(0, 50) + '...');
         
         // Debug del estado actual
         console.log('🔍 Estado TTS iOS:', {
@@ -978,9 +1016,27 @@ class SpeechManager {
             }
         });
         
-        // Si TTS no está activado aún, intentar activarlo automáticamente
+        // VERIFICACIÓN CRÍTICA: iOS puede "desactivar" TTS aleatoriamente
+        // Verificar si synthesis sigue funcionando
+        if (this.iosTTSActivated && this.synthesis) {
+            try {
+                // Test rápido para ver si synthesis sigue activo
+                const testVoices = this.synthesis.getVoices();
+                if (testVoices.length === 0) {
+                    console.warn('🍎⚠️ TTS se desactivó automáticamente, reactivando...');
+                    this.iosTTSActivated = false;
+                    this.iosTTSReady = false;
+                }
+            } catch (e) {
+                console.warn('🍎⚠️ Error verificando TTS, reactivando...', e);
+                this.iosTTSActivated = false;
+                this.iosTTSReady = false;
+            }
+        }
+        
+        // Si TTS no está activado o se desactivó, intentar reactivarlo
         if (!this.iosTTSActivated) {
-            console.log('🔄 TTS no activado, intentando activación automática...');
+            console.log('🔄 TTS no activado/desactivado, intentando (re)activación automática...');
             await this.forceActivateIOSTTS();
             
             // Si aún no está activado, guardar para después y mostrar mensaje claro
@@ -997,26 +1053,36 @@ class SpeechManager {
                 return false;
             }
         }
-        
         // Si TTS no está listo, esperar un poco más
         if (!this.iosTTSReady) {
             console.log('⏳ Esperando que TTS esté listo...');
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise(resolve => setTimeout(resolve, 1200));
         }
 
         try {
             this.stopSpeaking();
 
             return new Promise((resolve) => {
-                // Limpiar la cola de síntesis en iOS (crítico)
+                // Limpiar la cola de síntesis en iOS (crítico para iPhone 17 Pro)
                 if (this.synthesis.speaking || this.synthesis.pending) {
                     console.log('🧹 Limpiando cola de síntesis...');
                     this.synthesis.cancel();
                 }
                 
-                // Pausa más larga para iPhone 14+
+                // Pausa más larga para iPhone 17 Pro (más tiempo que iPhone 14)
                 setTimeout(() => {
-                    console.log('🍎 Creando utterance para iPhone 14+...');
+                    console.log('🍎 Creando utterance para iPhone 17 Pro...');
+                    
+                    // VERIFICACIÓN ADICIONAL: Asegurar que synthesis sigue disponible
+                    if (!this.synthesis || typeof this.synthesis.speak !== 'function') {
+                        console.error('🍎❌ Synthesis no disponible, reintentando...');
+                        this.isSpeaking = false;
+                        this.currentUtterance = null;
+                        this.iosTTSReady = true;
+                        resolve(false);
+                        return;
+                    }
+                    
                     this.currentUtterance = new SpeechSynthesisUtterance(text);
 
                     // Configuración específica para iOS
@@ -1027,12 +1093,12 @@ class SpeechManager {
                         console.log('🎤 Usando voz por defecto');
                     }
 
-                    // Configuración optimizada para iPhone 14+
-                    this.currentUtterance.rate = Math.min(CONFIG.SPEECH.VOICE_RATE, 1.0); // Más conservador
+                    // Configuración optimizada para iPhone 17 Pro
+                    this.currentUtterance.rate = Math.min(CONFIG.SPEECH.VOICE_RATE, 0.9); // Más conservador
                     this.currentUtterance.pitch = CONFIG.SPEECH.VOICE_PITCH;
-                    this.currentUtterance.volume = Math.max(CONFIG.SPEECH.VOICE_VOLUME, 0.8); // Asegurar volumen audible
+                    this.currentUtterance.volume = Math.max(CONFIG.SPEECH.VOICE_VOLUME, 0.9); // Asegurar volumen audible
                     
-                    console.log('🔊 Configuración TTS:', {
+                    console.log('🔊 Configuración TTS iPhone 17 Pro:', {
                         rate: this.currentUtterance.rate,
                         pitch: this.currentUtterance.pitch,
                         volume: this.currentUtterance.volume,
@@ -1042,23 +1108,25 @@ class SpeechManager {
                     let hasStarted = false;
                     let hasEnded = false;
                     
-                    // Timeout de seguridad
+                    // Timeout de seguridad más largo para iPhone 17 Pro
                     const safetyTimeout = setTimeout(() => {
                         if (!hasStarted && !hasEnded) {
-                            console.warn('⏰ Timeout de seguridad - TTS no inició');
+                            console.warn('⏰ Timeout de seguridad - TTS no inició en iPhone 17 Pro');
                             this.isSpeaking = false;
                             this.currentUtterance = null;
                             this.iosTTSReady = true;
+                            // Marcar TTS como desactivado para forzar reactivación
+                            this.iosTTSActivated = false;
                             resolve(false);
                         }
-                    }, 5000);
+                    }, 7000); // Timeout más largo
 
                     this.currentUtterance.onstart = () => {
                         hasStarted = true;
                         clearTimeout(safetyTimeout);
                         this.isSpeaking = true;
                         this.iosTTSReady = false;
-                        console.log('🍎🗣️ TTS iniciado exitosamente en iPhone 14+:', text.substring(0, 50) + '...');
+                        console.log('🍎🗣️ TTS iniciado exitosamente en iPhone 17 Pro:', text.substring(0, 50) + '...');
                     };
                     
                     this.currentUtterance.onend = () => {
@@ -1067,7 +1135,7 @@ class SpeechManager {
                         this.isSpeaking = false;
                         this.currentUtterance = null;
                         this.iosTTSReady = true;
-                        console.log('🍎✅ TTS completado exitosamente en iPhone 14+');
+                        console.log('🍎✅ TTS completado exitosamente en iPhone 17 Pro');
                         resolve(true);
                     };
                     
@@ -1077,7 +1145,9 @@ class SpeechManager {
                         this.isSpeaking = false;
                         this.currentUtterance = null;
                         this.iosTTSReady = true;
-                        console.error('🍎❌ Error TTS en iPhone 14+:', {
+                        // Marcar TTS como desactivado para forzar reactivación en próximo intento
+                        this.iosTTSActivated = false;
+                        console.error('🍎❌ Error TTS en iPhone 17 Pro (marcando para reactivación):', {
                             error: e?.error || e,
                             message: e?.message,
                             type: e?.type
@@ -1087,23 +1157,27 @@ class SpeechManager {
 
                     // Intentar hablar con manejo de errores mejorado
                     try {
-                        console.log('🍎 Ejecutando synthesis.speak()...');
+                        console.log('🍎 Ejecutando synthesis.speak() en iPhone 17 Pro...');
                         this.synthesis.speak(this.currentUtterance);
                         console.log('🍎 synthesis.speak() ejecutado, esperando eventos...');
                     } catch (speakError) {
                         clearTimeout(safetyTimeout);
-                        console.error('🍎❌ Error al ejecutar speak() en iPhone 14+:', speakError);
+                        console.error('🍎❌ Error al ejecutar speak() en iPhone 17 Pro:', speakError);
                         this.isSpeaking = false;
                         this.currentUtterance = null;
                         this.iosTTSReady = true;
+                        // Marcar TTS como desactivado para forzar reactivación
+                        this.iosTTSActivated = false;
                         resolve(false);
                     }
-                }, 200); // Pausa más larga para iPhone 14+
+                }, 300); // Pausa más larga para iPhone 17 Pro
             });
 
         } catch (error) {
-            console.error('🍎❌ Error en speakIOS() para iPhone 14+:', error);
+            console.error('🍎❌ Error en speakIOS() para iPhone 17 Pro:', error);
             this.iosTTSReady = true;
+            // Marcar TTS como desactivado para forzar reactivación
+            this.iosTTSActivated = false;
             return false;
         }
     }
