@@ -1,20 +1,27 @@
-# Solución para iPhone 17 Pro - "Funciona cuando quiere"
+# Solución para iPhone 17 Pro - Problemas Duales
 
 ## Problema Identificado 🐛
 
-Según la conversación:
+Según las conversaciones:
 - **iPhone 17 Pro**: "Está bugeado, funciona cuando quiere"
 - **TTS inconsistente**: El asistente habla a veces sí, a veces no
-- **Comportamiento aleatorio**: No es predecible cuándo funcionará
+- **Después de activar audio**: "Si se anda escuchando" ✅ pero "el micro no" ❌
+- **Problema dual**: TTS + Micrófono ambos afectados
 
 ## Causa del Problema en iPhone 17 Pro
 
-iOS 18+ en iPhone 17 Pro tiene políticas de TTS aún más estrictas:
+iOS 18+ en iPhone 17 Pro tiene múltiples problemas de audio:
 
+### Problemas de TTS:
 1. **Auto-desactivación**: TTS se desactiva automáticamente después de cierto tiempo
 2. **Verificación constante**: iOS verifica continuamente si TTS sigue activo
 3. **Recursos limitados**: El sistema puede "pausar" TTS para ahorrar batería
 4. **Contexto perdido**: La activación se pierde entre interacciones
+
+### Problemas de Micrófono:
+1. **Filtros agresivos**: echoCancellation y noiseSuppression interfieren
+2. **Frecuencia restrictiva**: 16kHz puede ser insuficiente
+3. **Configuración dual**: Tanto TTS como micrófono necesitan ajustes específicos
 
 ## Solución Implementada ✅
 

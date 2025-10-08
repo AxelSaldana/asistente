@@ -223,16 +223,16 @@ class SpeechManager {
             try {
                 console.log('🎤 Solicitando permisos de micrófono...');
                 
-                // Configuración específica para iPhone 16 (problemas de micrófono)
+                // Configuración específica para iPhone 16 y 17 Pro (problemas de micrófono)
                 let constraints;
-                if (this.isiPhone16) {
-                    console.log('📱 Configuración específica para iPhone 16...');
+                if (this.isiPhone16 || this.isiPhone17Pro) {
+                    console.log(`📱 Configuración específica para ${this.isiPhone16 ? 'iPhone 16' : 'iPhone 17 Pro'}...`);
                     constraints = {
                         audio: {
-                            echoCancellation: false, // Desactivar para iPhone 16
-                            noiseSuppression: false, // Desactivar para iPhone 16
+                            echoCancellation: false, // Desactivar para iPhone 16/17 Pro
+                            noiseSuppression: false, // Desactivar para iPhone 16/17 Pro
                             autoGainControl: true,
-                            sampleRate: { ideal: 44100 }, // Frecuencia más alta para iPhone 16
+                            sampleRate: { ideal: 44100 }, // Frecuencia más alta
                             channelCount: { ideal: 1 }
                         }
                     };
@@ -325,12 +325,12 @@ class SpeechManager {
 
             // Solicitar permisos específicos para iOS con timeout
             let constraints;
-            if (this.isiPhone16) {
-                console.log('📱 Fallback específico para iPhone 16...');
+            if (this.isiPhone16 || this.isiPhone17Pro) {
+                console.log(`📱 Fallback específico para ${this.isiPhone16 ? 'iPhone 16' : 'iPhone 17 Pro'}...`);
                 constraints = {
                     audio: {
-                        echoCancellation: false, // Desactivar para iPhone 16
-                        noiseSuppression: false, // Desactivar para iPhone 16
+                        echoCancellation: false, // Desactivar para iPhone 16/17 Pro
+                        noiseSuppression: false, // Desactivar para iPhone 16/17 Pro
                         autoGainControl: true,
                         sampleRate: { ideal: 44100 }, // Frecuencia más alta
                         channelCount: { ideal: 1 }
@@ -2983,7 +2983,6 @@ class VirtualAssistantApp {
             this.showPermissionModal();
             return;
         }
-
         if (this.ui.chatModal) {
             this.ui.chatModal.style.display = 'flex';
         }
@@ -2993,15 +2992,14 @@ class VirtualAssistantApp {
                 const welcomeMsg = await this.gemini.getWelcomeMessage();
                 this.addMessage('assistant', welcomeMsg);
 
-                if (this.speech) {
-                    this.speech.speak(welcomeMsg);
-                }
+                // NO hablar automáticamente al abrir chat - solo mostrar mensaje
+                // El asistente ya se presentó al iniciar la app
+                console.log('Chat abierto - mensaje mostrado sin voz para evitar repetición');
 
-                if (this.isInPreview && this.model3dManager) {
-                    this.model3dManager.playTalkingAnimation();
-                }
+                // NO animar el modelo automáticamente al abrir chat
+                // Solo mostrar el mensaje de texto
             } catch (error) {
-                console.error('❌ Error bienvenida:', error);
+                console.error('Error bienvenida:', error);
                 this.addMessage('assistant', 'Error: No se pudo conectar con Gemini 2.0.');
             }
         }
