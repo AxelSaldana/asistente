@@ -579,31 +579,53 @@ class SpeechManager {
             const userInteractionEvents = [
                 'touchstart', 'touchend', 'touchmove',
                 'click', 'tap', 'pointerdown', 'pointerup',
-                'mousedown', 'mouseup'
+                'mousedown', 'mouseup', 'keydown', 'keyup'
             ];
             
             let interactionDetected = false;
             
             const onFirstInteraction = (event) => {
-                if (interactionDetected) return;
+                if (interactionDetected || this.iosTTSActivated) return;
                 interactionDetected = true;
                 
-                console.log('👆 Primera interacción detectada:', event.type);
+                console.log('👆 Primera interacción detectada para TTS:', event.type);
                 
                 // Pequeña pausa para asegurar que el evento se complete
                 setTimeout(() => {
-                    activateIOSTTS();
+                    if (!this.iosTTSActivated) {
+                        activateIOSTTS();
+                    }
                 }, 50);
                 
-                // Remover listeners después de la primera interacción
-                userInteractionEvents.forEach(eventType => {
-                    document.removeEventListener(eventType, onFirstInteraction, { passive: true });
-                });
+                // No remover listeners inmediatamente, intentar varias veces
+                setTimeout(() => {
+                    userInteractionEvents.forEach(eventType => {
+                        document.removeEventListener(eventType, onFirstInteraction, { passive: true });
+                    });
+                }, 5000);
             };
             
             userInteractionEvents.forEach(eventType => {
                 document.addEventListener(eventType, onFirstInteraction, { passive: true });
             });
+            
+            // También intentar activar cuando se toque cualquier botón
+            const tryActivateOnButtonClick = (event) => {
+                if (this.iosTTSActivated) return;
+                
+                const target = event.target;
+                if (target && (target.tagName === 'BUTTON' || target.classList.contains('btn') || target.onclick)) {
+                    console.log('🔘 Interacción con botón detectada, intentando activar TTS');
+                    setTimeout(() => {
+                        if (!this.iosTTSActivated) {
+                            activateIOSTTS();
+                        }
+                    }, 100);
+                }
+            };
+            
+            document.addEventListener('click', tryActivateOnButtonClick, { passive: true });
+            document.addEventListener('touchend', tryActivateOnButtonClick, { passive: true });
             
             // También intentar activar en visibilitychange (cuando la app vuelve al foco)
             document.addEventListener('visibilitychange', () => {
@@ -961,11 +983,17 @@ class SpeechManager {
             console.log('🔄 TTS no activado, intentando activación automática...');
             await this.forceActivateIOSTTS();
             
-            // Si aún no está activado, guardar para después
+            // Si aún no está activado, guardar para después y mostrar mensaje claro
             if (!this.iosTTSActivated) {
                 console.log('🗓️ TTS no activado aún, guardando para después de la interacción del usuario');
                 this.pendingSpeech = text;
                 this.showIOSTTSNotice();
+                
+                // Mostrar mensaje visual de que el asistente quiere hablar
+                if (window.app && window.app.showStatus) {
+                    window.app.showStatus('🔊 El asistente quiere hablar. Toca "Activar Audio" para escucharlo.', 5000);
+                }
+                
                 return false;
             }
         }
@@ -1087,54 +1115,88 @@ class SpeechManager {
         if (!this.isIOSSafari || this.iosTTSActivated) return true;
         
         try {
-            console.log('🔄 Forzando activación de TTS en iOS...');
+            console.log('🔄 Forzando activación de TTS en iOS Safari...');
             
-            // Crear utterance silencioso para activar TTS
-            const silentUtterance = new SpeechSynthesisUtterance(' ');
-            silentUtterance.volume = 0.01;
-            silentUtterance.rate = 10;
+            // Limpiar cualquier síntesis pendiente primero
+            if (this.synthesis.speaking || this.synthesis.pending) {
+                this.synthesis.cancel();
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            // Crear utterance de activación más audible para iOS
+            const activationUtterance = new SpeechSynthesisUtterance('Activando audio');
+            activationUtterance.volume = 0.1; // Muy bajo pero audible
+            activationUtterance.rate = 2; // Rápido
+            activationUtterance.pitch = 0.5;
+            
+            // Seleccionar voz en español si está disponible
+            const voices = this.synthesis.getVoices();
+            const spanishVoice = voices.find(voice => 
+                voice.lang.startsWith('es') || voice.lang.includes('ES')
+            );
+            if (spanishVoice) {
+                activationUtterance.voice = spanishVoice;
+            }
             
             return new Promise((resolve) => {
+                let resolved = false;
+                
                 const timeout = setTimeout(() => {
-                    console.log('⏰ Timeout en activación forzada, continuando...');
-                    this.iosTTSActivated = true;
-                    this.iosTTSReady = true;
-                    resolve(true);
-                }, 1000);
-                
-                silentUtterance.onstart = () => {
-                    clearTimeout(timeout);
-                    console.log('✅ TTS activado exitosamente (forzado)');
-                    this.iosTTSActivated = true;
-                    this.iosTTSReady = true;
-                    resolve(true);
-                };
-                
-                silentUtterance.onend = () => {
-                    clearTimeout(timeout);
-                    if (!this.iosTTSActivated) {
+                    if (!resolved) {
+                        resolved = true;
+                        console.log('⏰ Timeout en activación forzada, marcando como activado');
                         this.iosTTSActivated = true;
                         this.iosTTSReady = true;
+                        resolve(true);
                     }
-                    resolve(true);
+                }, 2000);
+                
+                activationUtterance.onstart = () => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        console.log('✅ TTS activado exitosamente (forzado)');
+                        this.iosTTSActivated = true;
+                        this.iosTTSReady = true;
+                        resolve(true);
+                    }
                 };
                 
-                silentUtterance.onerror = () => {
-                    clearTimeout(timeout);
-                    console.warn('⚠️ Error en activación forzada, marcando como activado');
-                    this.iosTTSActivated = true;
-                    this.iosTTSReady = true;
-                    resolve(false);
+                activationUtterance.onend = () => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        console.log('🔚 TTS activación completada');
+                        this.iosTTSActivated = true;
+                        this.iosTTSReady = true;
+                        resolve(true);
+                    }
+                };
+                
+                activationUtterance.onerror = (e) => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        console.warn('⚠️ Error en activación forzada:', e?.error || e);
+                        // Marcar como activado de todos modos para intentar funcionar
+                        this.iosTTSActivated = true;
+                        this.iosTTSReady = true;
+                        resolve(false);
+                    }
                 };
                 
                 try {
-                    this.synthesis.speak(silentUtterance);
+                    console.log('🍎 Ejecutando utterance de activación...');
+                    this.synthesis.speak(activationUtterance);
                 } catch (error) {
-                    clearTimeout(timeout);
-                    console.warn('⚠️ Error ejecutando activación forzada:', error);
-                    this.iosTTSActivated = true;
-                    this.iosTTSReady = true;
-                    resolve(false);
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        console.warn('⚠️ Error ejecutando activación forzada:', error);
+                        this.iosTTSActivated = true;
+                        this.iosTTSReady = true;
+                        resolve(false);
+                    }
                 }
             });
         } catch (error) {
@@ -2465,6 +2527,11 @@ class VirtualAssistantApp {
 
             console.log('✅ Sistema inicializado correctamente');
 
+            // 6. Mostrar mensaje de bienvenida automático
+            setTimeout(() => {
+                this.showWelcomeMessage();
+            }, 1000);
+
         } catch (error) {
             console.error('❌ ERROR CRÍTICO:', error);
             this.updatePermissionStatus(error.message);
@@ -3042,6 +3109,53 @@ class VirtualAssistantApp {
         }
     }
 
+    async showWelcomeMessage() {
+        if (!this.isInitialized) return;
+
+        try {
+            console.log('🤖 Mostrando mensaje de bienvenida automático...');
+            
+            const welcomeMsg = await this.gemini.getWelcomeMessage();
+
+            // Mostrar mensaje visual en el status
+            this.showStatus(`🤖 ${welcomeMsg}`, 8000);
+
+            // Intentar hablar el mensaje de bienvenida
+            if (this.speech) {
+                console.log('🗣️ Intentando hablar mensaje de bienvenida...');
+                const speechResult = await this.speech.speak(welcomeMsg);
+                
+                if (!speechResult && this.speech.isIOSSafari) {
+                    // Si no se pudo hablar en iOS, mostrar indicador
+                    console.log('🍎 TTS no activado en iOS, mostrando indicador...');
+                    this.showIOSTTSNotice();
+                }
+            }
+
+            // Animar el modelo si está visible
+            if (this.isInPreview && this.model3dManager) {
+                this.model3dManager.playTalkingAnimation();
+                
+                // Volver a idle después de hablar
+                setTimeout(() => {
+                    if (this.model3dManager) {
+                        this.model3dManager.playIdleAnimation();
+                    }
+                }, 5000);
+            }
+
+        } catch (error) {
+            console.error('❌ Error en mensaje de bienvenida:', error);
+            // Mostrar mensaje de bienvenida básico como fallback
+            const fallbackMsg = '¡Hola! Soy tu asistente virtual con IA Gemini 2.0. ¿En qué puedo ayudarte?';
+            this.showStatus(`🤖 ${fallbackMsg}`, 6000);
+            
+            if (this.speech) {
+                this.speech.speak(fallbackMsg);
+            }
+        }
+    }
+
     async showARWelcome() {
         if (!this.isInAR || !this.ui.arResponse) return;
 
@@ -3105,6 +3219,51 @@ class VirtualAssistantApp {
         console.log('📋', message);
     }
 
+    showStatus(message, duration = 3000) {
+        console.log('📢 Status:', message);
+        
+        // Mostrar en el status display si existe
+        if (this.ui.statusDisplay) {
+            const statusContent = this.ui.statusDisplay.querySelector('.status-content');
+            if (statusContent) {
+                // Crear elemento temporal para el mensaje
+                const statusMsg = document.createElement('div');
+                statusMsg.textContent = message;
+                statusMsg.style.cssText = `
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 15px;
+                    margin-bottom: 5px;
+                    font-size: 14px;
+                    animation: fadeInOut 0.3s ease-in;
+                `;
+                
+                statusContent.appendChild(statusMsg);
+                
+                // Auto-remover después del duration
+                setTimeout(() => {
+                    if (statusMsg.parentNode) {
+                        statusMsg.style.opacity = '0';
+                        setTimeout(() => {
+                            if (statusMsg.parentNode) {
+                                statusMsg.parentNode.removeChild(statusMsg);
+                            }
+                        }, 300);
+                    }
+                }, duration);
+            }
+        }
+        
+        // También mostrar en chat status si está visible
+        if (this.ui.chatStatus && this.ui.chatModal && this.ui.chatModal.style.display !== 'none') {
+            this.updateChatStatus(message);
+            setTimeout(() => {
+                this.updateChatStatus('');
+            }, duration);
+        }
+    }
+
     hideLoadingScreen() {
         this.isLoading = false;
         if (this.ui.loadingScreen) {
@@ -3119,51 +3278,102 @@ class VirtualAssistantApp {
     showIOSTTSNotice() {
         if (!this.speech?.isIOSSafari || this.speech?.iosTTSActivated) return;
         
-        console.log(' Mostrando indicador de activaci n TTS para iOS');
+        console.log('🍎📢 Mostrando indicador de activación TTS para iOS');
         if (this.ui.iosTTSNotice) {
             this.ui.iosTTSNotice.classList.remove('hidden');
             
-            // Agregar event listener al bot n de activaci n
+            // Agregar event listener al botón de activación
             const activateBtn = this.ui.iosTTSNotice.querySelector('.tts-activate-btn');
             if (activateBtn) {
-                activateBtn.onclick = async () => {
-                    console.log('Usuario presion  bot n de activaci n TTS');
+                // Remover listeners anteriores
+                activateBtn.replaceWith(activateBtn.cloneNode(true));
+                const newActivateBtn = this.ui.iosTTSNotice.querySelector('.tts-activate-btn');
+                
+                newActivateBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('👆 Usuario presionó botón de activación TTS');
+                    newActivateBtn.textContent = '🔄 Activando...';
+                    newActivateBtn.disabled = true;
+                    await this.activateTTSFromUserGesture();
+                };
+                
+                // También agregar eventos táctiles para iOS
+                newActivateBtn.ontouchstart = (e) => {
+                    e.preventDefault();
+                    newActivateBtn.style.transform = 'scale(0.95)';
+                };
+                
+                newActivateBtn.ontouchend = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    newActivateBtn.style.transform = 'scale(1)';
+                    console.log('👆 Touch: Usuario activó TTS');
+                    newActivateBtn.textContent = '🔄 Activando...';
+                    newActivateBtn.disabled = true;
                     await this.activateTTSFromUserGesture();
                 };
             }
             
-            // Tambi n permitir activaci n tocando el modal completo
+            // También permitir activación tocando el modal completo
             this.ui.iosTTSNotice.onclick = async (e) => {
                 if (e.target === this.ui.iosTTSNotice || e.target.classList.contains('tts-notice-content')) {
-                    console.log('Usuario toc  modal de activaci n TTS');
+                    console.log('👆 Usuario tocó modal de activación TTS');
                     await this.activateTTSFromUserGesture();
                 }
             };
+            
+            // Auto-ocultar después de 10 segundos si no se activa
+            setTimeout(() => {
+                if (!this.speech?.iosTTSActivated && this.ui.iosTTSNotice && !this.ui.iosTTSNotice.classList.contains('hidden')) {
+                    console.log('⏰ Auto-ocultando indicador TTS después de 10s');
+                    this.hideIOSTTSNotice();
+                }
+            }, 10000);
         }
     }
 
     async activateTTSFromUserGesture() {
         try {
-            console.log('Activando TTS desde gesto del usuario...');
+            console.log('🍎🎤 Activando TTS desde gesto del usuario...');
             
             if (this.speech && this.speech.isIOSSafari) {
-                // Forzar activaci n inmediata
-                await this.speech.forceActivateIOSTTS();
+                // Mostrar feedback visual inmediato
+                this.showStatus('🔊 Activando audio del asistente...');
                 
-                // Si hay speech pendiente, ejecutarlo
-                if (this.speech.pendingSpeech) {
-                    console.log('Ejecutando speech pendiente:', this.speech.pendingSpeech.substring(0, 50) + '...');
-                    setTimeout(async () => {
-                        await this.speech.speak(this.speech.pendingSpeech);
-                        this.speech.pendingSpeech = null;
-                    }, 300);
+                // Forzar activación inmediata
+                const activated = await this.speech.forceActivateIOSTTS();
+                
+                if (activated) {
+                    console.log('✅ TTS activado exitosamente desde gesto del usuario');
+                    this.showStatus('✅ Audio del asistente activado', 2000);
+                    
+                    // Si hay speech pendiente, ejecutarlo
+                    if (this.speech.pendingSpeech) {
+                        console.log('🗣️ Ejecutando speech pendiente:', this.speech.pendingSpeech.substring(0, 50) + '...');
+                        setTimeout(async () => {
+                            const success = await this.speech.speak(this.speech.pendingSpeech);
+                            if (success) {
+                                console.log('✅ Speech pendiente ejecutado exitosamente');
+                            } else {
+                                console.warn('⚠️ Falló la ejecución del speech pendiente');
+                                this.showStatus('⚠️ Error reproduciendo audio. Intenta de nuevo.', 3000);
+                            }
+                            this.speech.pendingSpeech = null;
+                        }, 500);
+                    }
+                } else {
+                    console.warn('⚠️ No se pudo activar TTS desde gesto del usuario');
+                    this.showStatus('⚠️ No se pudo activar el audio. Intenta de nuevo.', 3000);
                 }
             }
             
             this.hideIOSTTSNotice();
             
         } catch (error) {
-            console.error('Error activando TTS desde gesto:', error);
+            console.error('❌ Error activando TTS desde gesto:', error);
+            this.showStatus('❌ Error activando audio. Intenta de nuevo.', 3000);
+            this.hideIOSTTSNotice();
         }
     }
 

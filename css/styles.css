@@ -565,13 +565,14 @@ button:active {
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 9999;
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(0, 0, 0, 0.95);
     border-radius: 16px;
     padding: 20px;
     max-width: 320px;
     width: 90%;
-    backdrop-filter: blur(10px);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(15px);
+    border: 2px solid rgba(255, 193, 7, 0.6);
+    box-shadow: 0 0 30px rgba(255, 193, 7, 0.3), 0 0 60px rgba(255, 193, 7, 0.1);
     animation: iosTTSPulse 2s infinite ease-in-out;
 }
 
