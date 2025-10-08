@@ -115,6 +115,7 @@ class GeminiClient {
             const prompt = `Eres Avatar, un asistente virtual inteligente con IA Gemini 2.0.
 Respondes en español de forma natural y conversacional.
 Eres amigable, útil y entusiasta.
+No uses emojis en tus respuestas.
 
 Usuario: ${message}
 Avatar:`;
@@ -140,7 +141,7 @@ Avatar:`;
 
     async getWelcomeMessage() {
         try {
-            return await this.sendDirectToGemini('Saluda al usuario como Avatar, un asistente virtual con IA Gemini 2.0. Sé amigable y entusiasta, máximo 2 frases.');
+            return await this.sendDirectToGemini('Saluda al usuario como Avatar, un asistente virtual con IA Gemini 2.0. Sé amigable y entusiasta, máximo 2 frases. No uses emojis.');
         } catch (error) {
             throw new Error('No se pudo obtener mensaje de bienvenida');
         }
@@ -148,7 +149,7 @@ Avatar:`;
 
     async getARWelcomeMessage() {
         try {
-            return await this.sendDirectToGemini('El usuario activó el modo AR. Salúdalo con entusiasmo sobre la experiencia AR con Gemini 2.0. Máximo 2 frases.');
+            return await this.sendDirectToGemini('El usuario activó el modo AR. Salúdalo con entusiasmo sobre la experiencia AR con Gemini 2.0. Máximo 2 frases. No uses emojis.');
         } catch (error) {
             throw new Error('No se pudo obtener mensaje AR');
         }
@@ -642,7 +643,6 @@ class SpeechManager {
                     });
                 }, 5000);
             };
-            
             userInteractionEvents.forEach(eventType => {
                 document.addEventListener(eventType, onFirstInteraction, { passive: true });
             });
@@ -665,17 +665,39 @@ class SpeechManager {
             document.addEventListener('click', tryActivateOnButtonClick, { passive: true });
             document.addEventListener('touchend', tryActivateOnButtonClick, { passive: true });
             
-            // También intentar activar en visibilitychange (cuando la app vuelve al foco)
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden && !this.iosTTSActivated) {
-                    console.log('👁️ App visible, intentando activar TTS...');
-                    setTimeout(() => {
-                        if (!this.iosTTSActivated) {
-                            activateIOSTTS();
-                        }
-                    }, 100);
+            // ACTIVACIÓN AUTOMÁTICA MÁS AGRESIVA
+            // Intentar activar en cualquier interacción con la página
+            const autoActivateTTS = (event) => {
+                if (this.iosTTSActivated) return;
+                
+                console.log('👆 Cualquier interacción detectada, activando TTS automáticamente...');
+                setTimeout(() => {
+                    if (!this.iosTTSActivated) {
+                        activateIOSTTS();
+                    }
+                }, 50);
+            };
+            
+            // Escuchar CUALQUIER interacción del usuario
+            document.addEventListener('touchstart', autoActivateTTS, { passive: true, once: true });
+            document.addEventListener('click', autoActivateTTS, { passive: true, once: true });
+            document.addEventListener('keydown', autoActivateTTS, { passive: true, once: true });
+            
+            // También intentar después de un delay corto
+            setTimeout(() => {
+                if (!this.iosTTSActivated) {
+                    console.log('⏰ Intentando activación automática después de 2 segundos...');
+                    activateIOSTTS();
                 }
-            });
+            }, 2000);
+            
+            // Intentar activación más agresiva después de 5 segundos
+            setTimeout(() => {
+                if (!this.iosTTSActivated) {
+                    console.log('🔄 Segundo intento de activación automática...');
+                    activateIOSTTS();
+                }
+            }, 5000);
             
             console.log('🍎📱 TTS iOS configurado para iPhone 14+. Esperando primera interacción del usuario...');
             console.log('📝 Eventos escuchando:', userInteractionEvents);
@@ -3395,13 +3417,21 @@ class VirtualAssistantApp {
                 }
             };
             
-            // Auto-ocultar después de 10 segundos si no se activa
+            // Auto-ocultar después de 3 segundos si no se activa (más rápido)
             setTimeout(() => {
                 if (!this.speech?.iosTTSActivated && this.ui.iosTTSNotice && !this.ui.iosTTSNotice.classList.contains('hidden')) {
-                    console.log('⏰ Auto-ocultando indicador TTS después de 10s');
+                    console.log('⏰ Auto-ocultando indicador TTS después de 3s');
                     this.hideIOSTTSNotice();
                 }
-            }, 10000);
+            }, 3000);
+            
+            // Intentar activación automática inmediata
+            setTimeout(async () => {
+                if (!this.speech?.iosTTSActivated) {
+                    console.log('🤖 Intentando activación automática del modal...');
+                    await this.activateTTSFromUserGesture();
+                }
+            }, 500);
         }
     }
 

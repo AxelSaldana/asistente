@@ -10,10 +10,15 @@ export class CameraManager {
         
         this.constraints = {
             video: {
-                facingMode: { ideal: 'environment' },
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                frameRate: { ideal: 30 }
+                facingMode: { exact: 'environment' }, // Forzar cámara trasera
+                width: { min: 640, ideal: 1280, max: 1920 },
+                height: { min: 480, ideal: 720, max: 1080 },
+                frameRate: { ideal: 30, max: 60 },
+                // Fijar zoom y evitar auto-ajustes
+                zoom: { ideal: 1.0 },
+                focusMode: { ideal: 'continuous' },
+                exposureMode: { ideal: 'continuous' },
+                whiteBalanceMode: { ideal: 'continuous' }
             },
             audio: false
         };
@@ -104,15 +109,63 @@ export class CameraManager {
     setupVideoEvents() {
         this.videoElement.addEventListener('loadeddata', () => {
             console.log('📹 Video data cargado');
+            this.fixVideoSettings();
         });
 
         this.videoElement.addEventListener('play', () => {
             console.log('▶️ Video reproduciendo');
+            this.fixVideoSettings();
         });
 
         this.videoElement.addEventListener('pause', () => {
             console.log('⏸️ Video pausado');
         });
+
+        // Prevenir zoom con gestos táctiles
+        this.videoElement.addEventListener('touchstart', this.preventZoom.bind(this), { passive: false });
+        this.videoElement.addEventListener('touchmove', this.preventZoom.bind(this), { passive: false });
+        this.videoElement.addEventListener('gesturestart', this.preventZoom.bind(this), { passive: false });
+        this.videoElement.addEventListener('gesturechange', this.preventZoom.bind(this), { passive: false });
+    }
+
+    /**
+     * Fijar configuraciones del video para evitar zoom
+     */
+    fixVideoSettings() {
+        if (this.videoElement && this.stream) {
+            // Fijar tamaño del video
+            this.videoElement.style.objectFit = 'cover';
+            this.videoElement.style.objectPosition = 'center';
+            this.videoElement.style.transform = 'scale(1)'; // Fijar escala
+            this.videoElement.style.transformOrigin = 'center';
+            
+            // Desactivar zoom del navegador
+            this.videoElement.style.touchAction = 'none';
+            this.videoElement.style.userSelect = 'none';
+            this.videoElement.style.webkitUserSelect = 'none';
+            
+            console.log('🔒 Configuraciones de video fijadas');
+        }
+    }
+
+    /**
+     * Prevenir zoom en el video
+     */
+    preventZoom(event) {
+        // Prevenir zoom con múltiples toques
+        if (event.touches && event.touches.length > 1) {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log('🚫 Zoom prevenido');
+            return false;
+        }
+        
+        // Prevenir gestos de zoom
+        if (event.type.includes('gesture')) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        }
     }
 
     /**
