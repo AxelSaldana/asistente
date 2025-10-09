@@ -74,6 +74,13 @@ class GeminiClient {
         } catch (error) {
             console.error('❌ Test de conexión falló:', error);
             console.error('📋 Detalles del error:', error.message);
+            
+            // Si es rate limiting, aún consideramos la conexión como válida
+            if (error.message.includes('429')) {
+                console.warn('⚠️ Rate limit alcanzado, pero API Key es válida');
+                return true; // API Key funciona, solo hay límite de cuota
+            }
+            
             return false;
         }
     }
@@ -95,6 +102,13 @@ class GeminiClient {
 
         if (!response.ok) {
             const errorText = await response.text();
+            
+            // Manejo específico para rate limiting
+            if (response.status === 429) {
+                console.warn('⚠️ Cuota de Gemini excedida. Usando respuesta de fallback.');
+                return 'Lo siento, he alcanzado mi límite de consultas por hoy. Por favor, intenta más tarde o considera actualizar tu plan de Gemini API.';
+            }
+            
             throw new Error(`Error ${response.status}: ${errorText}`);
         }
 
