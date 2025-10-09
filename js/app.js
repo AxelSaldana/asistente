@@ -115,7 +115,6 @@ class GeminiClient {
             const prompt = `Eres Avatar, un asistente virtual inteligente con IA Gemini 2.0.
 Respondes en español de forma natural y conversacional.
 Eres amigable, útil y entusiasta.
-No uses emojis en tus respuestas.
 
 Usuario: ${message}
 Avatar:`;
@@ -141,7 +140,7 @@ Avatar:`;
 
     async getWelcomeMessage() {
         try {
-            return await this.sendDirectToGemini('Saluda al usuario como Avatar, un asistente virtual con IA Gemini 2.0. Sé amigable y entusiasta, máximo 2 frases. No uses emojis.');
+            return await this.sendDirectToGemini('Saluda al usuario como Avatar, un asistente virtual con IA Gemini 2.0. Sé amigable y entusiasta, máximo 2 frases.');
         } catch (error) {
             throw new Error('No se pudo obtener mensaje de bienvenida');
         }
@@ -149,7 +148,7 @@ Avatar:`;
 
     async getARWelcomeMessage() {
         try {
-            return await this.sendDirectToGemini('El usuario activó el modo AR. Salúdalo con entusiasmo sobre la experiencia AR con Gemini 2.0. Máximo 2 frases. No uses emojis.');
+            return await this.sendDirectToGemini('El usuario activó el modo AR. Salúdalo con entusiasmo sobre la experiencia AR con Gemini 2.0. Máximo 2 frases.');
         } catch (error) {
             throw new Error('No se pudo obtener mensaje AR');
         }
@@ -172,11 +171,11 @@ class SpeechManager {
         this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         this.isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         this.isIOSSafari = this.isIOS && this.isSafari;
-        
+
         // Detección específica de iPhone 16 (problema de micrófono)
         this.isiPhone16 = /iPhone16/.test(navigator.userAgent) || (this.isIOS && navigator.userAgent.includes('16_'));
         this.isiPhone17Pro = /iPhone17/.test(navigator.userAgent) || (this.isIOS && navigator.userAgent.includes('17_'));
-        
+
         // Fallback para iOS
         this.mediaRecorder = null;
         this.audioChunks = [];
@@ -209,7 +208,7 @@ class SpeechManager {
 
             // Verificar soporte de Speech Recognition
             const hasSpeechRecognition = ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
-            
+
             if (!hasSpeechRecognition) {
                 if (this.isIOSSafari) {
                     console.warn('🍎 Safari en iOS no soporta Web Speech API, usando fallback con MediaRecorder');
@@ -223,7 +222,7 @@ class SpeechManager {
             // Solicitar permiso de micrófono explícito con timeout para iOS
             try {
                 console.log('🎤 Solicitando permisos de micrófono...');
-                
+
                 // Configuración específica para iPhone 16 y 17 Pro (problemas de micrófono)
                 let constraints;
                 if (this.isiPhone16 || this.isiPhone17Pro) {
@@ -259,7 +258,7 @@ class SpeechManager {
                     navigator.mediaDevices.getUserMedia(constraints),
                     permissionTimeout
                 ]);
-                
+
                 console.log('✅ Permisos de micrófono concedidos');
                 stream.getTracks().forEach(track => track.stop());
             } catch (e) {
@@ -282,12 +281,12 @@ class SpeechManager {
 
             console.log('🔧 Configurando Speech Recognition...');
             this.setupSpeechRecognition();
-            
+
             console.log('🔧 Configurando Speech Synthesis...');
             try {
                 await this.setupSpeechSynthesis();
                 console.log('🔧 Speech Synthesis configurado');
-                
+
                 // Configuración específica para iOS TTS
                 if (this.isIOSSafari) {
                     console.log('🍎 Configurando TTS específico para iOS Safari...');
@@ -311,13 +310,13 @@ class SpeechManager {
     async initIOSFallback() {
         try {
             console.log('Configurando fallback para iOS Safari...');
-            
+
             // Verificar contexto seguro
             if (!window.isSecureContext) {
                 this.unsupportedReason = 'iOS Safari requiere HTTPS para acceso al micrófono.';
                 return false;
             }
-            
+
             // Verificar MediaRecorder support
             if (!('MediaRecorder' in window)) {
                 this.unsupportedReason = 'Tu dispositivo iOS no soporta grabación de audio web.';
@@ -357,14 +356,14 @@ class SpeechManager {
                 navigator.mediaDevices.getUserMedia(constraints),
                 permissionTimeout
             ]);
-            
+
             this.stream = stream;
             console.log('✅ Permisos de audio concedidos en iOS');
-            
+
             // Configurar MediaRecorder con detección de formato
             const supportedTypes = ['audio/mp4', 'audio/webm', 'audio/wav', 'audio/ogg'];
             let options = {};
-            
+
             for (const type of supportedTypes) {
                 if (MediaRecorder.isTypeSupported(type)) {
                     options.mimeType = type;
@@ -372,9 +371,9 @@ class SpeechManager {
                     break;
                 }
             }
-            
+
             this.mediaRecorder = new MediaRecorder(stream, options);
-            
+
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     this.audioChunks.push(event.data);
@@ -382,15 +381,15 @@ class SpeechManager {
             };
 
             await this.setupSpeechSynthesis();
-            
+
             // Configuración específica para iOS TTS
             console.log('🍎 Configurando TTS específico para iOS Safari...');
             await this.setupIOSSpeechSynthesis();
-            
+
             this.isInitialized = true;
             console.log('Fallback iOS configurado correctamente');
             return true;
-            
+
         } catch (error) {
             console.error('❌ Error configurando fallback iOS:', error);
             if (error?.name === 'NotAllowedError') {
@@ -409,7 +408,7 @@ class SpeechManager {
     setupSpeechRecognition() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) return;
-        
+
         this.recognition = new SpeechRecognition();
 
         this.recognition.continuous = false;
@@ -417,11 +416,11 @@ class SpeechManager {
         this.recognition.lang = CONFIG.SPEECH.LANGUAGE;
         this.recognition.maxAlternatives = 1;
 
-        this.recognition.onstart = () => { 
+        this.recognition.onstart = () => {
             this.isListening = true;
             console.log('🎤 Reconocimiento iniciado');
         };
-        this.recognition.onend = () => { 
+        this.recognition.onend = () => {
             this.isListening = false;
             console.log('🎤 Reconocimiento terminado');
         };
@@ -437,18 +436,18 @@ class SpeechManager {
             console.log('🔇 Speech synthesis no disponible');
             return;
         }
-        
+
         return new Promise((resolve) => {
             let resolved = false;
-            
+
             const loadVoices = () => {
                 if (resolved) return;
                 resolved = true;
-                
+
                 this.voices = this.synthesis.getVoices();
                 console.log('🎵 Voces disponibles:', this.voices.length);
-                
-                const spanishVoice = this.voices.find(voice => 
+
+                const spanishVoice = this.voices.find(voice =>
                     voice.lang.startsWith('es') || voice.lang.includes('ES')
                 );
                 if (spanishVoice) {
@@ -500,14 +499,14 @@ class SpeechManager {
 
         return new Promise((resolve) => {
             console.log('🍎 Configurando TTS para iOS Safari...');
-            
+
             // En iOS, necesitamos "activar" la síntesis con una interacción del usuario
             this.iosTTSReady = false;
             this.iosTTSActivated = false;
-            
+
             const activateIOSTTS = () => {
                 if (this.iosTTSActivated) return;
-                
+
                 try {
                     console.log('🍎📱 Activando TTS en iOS Safari (iPhone 14+)...');
                     console.log('🔍 Estado actual:', {
@@ -517,47 +516,47 @@ class SpeechManager {
                         paused: this.synthesis?.paused,
                         voices: this.synthesis?.getVoices()?.length || 0
                     });
-                    
+
                     // Limpiar cualquier síntesis pendiente
                     if (this.synthesis.speaking || this.synthesis.pending) {
                         this.synthesis.cancel();
                     }
-                    
+
                     // Crear una utterance silenciosa para "activar" el TTS
                     // En iPhone 14+ necesitamos un texto muy corto pero audible
                     const silentUtterance = new SpeechSynthesisUtterance('.');
                     silentUtterance.volume = 0.01; // Muy bajo pero no 0
                     silentUtterance.rate = 10; // Muy rápido
                     silentUtterance.pitch = 0.1;
-                    
+
                     let activationTimeout = setTimeout(() => {
                         console.warn('⏰ Timeout activando TTS, marcando como activado de todos modos');
                         this.iosTTSActivated = true;
                         this.iosTTSReady = true;
-                        
+
                         // Ocultar indicador de iOS TTS
                         if (window.app && window.app.hideIOSTTSNotice) {
                             window.app.hideIOSTTSNotice();
                         }
-                        
+
                         if (this.pendingSpeech) {
                             console.log('🗣️ Ejecutando síntesis pendiente (timeout):', this.pendingSpeech.substring(0, 50) + '...');
                             setTimeout(() => this.speak(this.pendingSpeech), 100);
                             this.pendingSpeech = null;
                         }
                     }, 3000);
-                    
+
                     silentUtterance.onstart = () => {
                         clearTimeout(activationTimeout);
                         console.log('✅🍎 TTS activado exitosamente en iOS Safari');
                         this.iosTTSActivated = true;
                         this.iosTTSReady = true;
-                        
+
                         // Ocultar indicador de iOS TTS
                         if (window.app && window.app.hideIOSTTSNotice) {
                             window.app.hideIOSTTSNotice();
                         }
-                        
+
                         // Si hay una síntesis pendiente, ejecutarla ahora
                         if (this.pendingSpeech) {
                             console.log('🗣️ Ejecutando síntesis pendiente:', this.pendingSpeech.substring(0, 50) + '...');
@@ -565,46 +564,46 @@ class SpeechManager {
                             this.pendingSpeech = null;
                         }
                     };
-                    
+
                     silentUtterance.onend = () => {
                         clearTimeout(activationTimeout);
                         this.iosTTSReady = true;
                         console.log('🍎 TTS activación completada');
                     };
-                    
+
                     silentUtterance.onerror = (e) => {
                         clearTimeout(activationTimeout);
                         console.warn('⚠️ Error activando TTS en iOS:', e?.error || e);
                         // Marcar como activado de todos modos para intentar funcionar
                         this.iosTTSActivated = true;
                         this.iosTTSReady = true;
-                        
+
                         // Ocultar indicador de iOS TTS
                         if (window.app && window.app.hideIOSTTSNotice) {
                             window.app.hideIOSTTSNotice();
                         }
-                        
+
                         if (this.pendingSpeech) {
                             console.log('🗣️ Intentando síntesis pendiente a pesar del error...');
                             setTimeout(() => this.speak(this.pendingSpeech), 300);
                             this.pendingSpeech = null;
                         }
                     };
-                    
+
                     console.log('🍎 Ejecutando utterance de activación...');
                     this.synthesis.speak(silentUtterance);
-                    
+
                 } catch (error) {
                     console.warn('⚠️ Error en activación TTS iOS:', error);
                     // Marcar como activado de todos modos
                     this.iosTTSActivated = true;
                     this.iosTTSReady = true;
-                    
+
                     // Ocultar indicador de iOS TTS
                     if (window.app && window.app.hideIOSTTSNotice) {
                         window.app.hideIOSTTSNotice();
                     }
-                    
+
                     if (this.pendingSpeech) {
                         console.log('🗣️ Intentando síntesis pendiente tras error de activación...');
                         setTimeout(() => this.speak(this.pendingSpeech), 500);
@@ -612,7 +611,7 @@ class SpeechManager {
                     }
                 }
             };
-            
+
             // Activar TTS en la primera interacción del usuario
             // Más eventos para iPhone 14+ y iOS recientes
             const userInteractionEvents = [
@@ -620,22 +619,22 @@ class SpeechManager {
                 'click', 'tap', 'pointerdown', 'pointerup',
                 'mousedown', 'mouseup', 'keydown', 'keyup'
             ];
-            
+
             let interactionDetected = false;
-            
+
             const onFirstInteraction = (event) => {
                 if (interactionDetected || this.iosTTSActivated) return;
                 interactionDetected = true;
-                
+
                 console.log('👆 Primera interacción detectada para TTS:', event.type);
-                
+
                 // Pequeña pausa para asegurar que el evento se complete
                 setTimeout(() => {
                     if (!this.iosTTSActivated) {
                         activateIOSTTS();
                     }
                 }, 50);
-                
+
                 // No remover listeners inmediatamente, intentar varias veces
                 setTimeout(() => {
                     userInteractionEvents.forEach(eventType => {
@@ -643,14 +642,15 @@ class SpeechManager {
                     });
                 }, 5000);
             };
+
             userInteractionEvents.forEach(eventType => {
                 document.addEventListener(eventType, onFirstInteraction, { passive: true });
             });
-            
+
             // También intentar activar cuando se toque cualquier botón
             const tryActivateOnButtonClick = (event) => {
                 if (this.iosTTSActivated) return;
-                
+
                 const target = event.target;
                 if (target && (target.tagName === 'BUTTON' || target.classList.contains('btn') || target.onclick)) {
                     console.log('🔘 Interacción con botón detectada, intentando activar TTS');
@@ -661,44 +661,22 @@ class SpeechManager {
                     }, 100);
                 }
             };
-            
+
             document.addEventListener('click', tryActivateOnButtonClick, { passive: true });
             document.addEventListener('touchend', tryActivateOnButtonClick, { passive: true });
-            
-            // ACTIVACIÓN AUTOMÁTICA MÁS AGRESIVA
-            // Intentar activar en cualquier interacción con la página
-            const autoActivateTTS = (event) => {
-                if (this.iosTTSActivated) return;
-                
-                console.log('👆 Cualquier interacción detectada, activando TTS automáticamente...');
-                setTimeout(() => {
-                    if (!this.iosTTSActivated) {
-                        activateIOSTTS();
-                    }
-                }, 50);
-            };
-            
-            // Escuchar CUALQUIER interacción del usuario
-            document.addEventListener('touchstart', autoActivateTTS, { passive: true, once: true });
-            document.addEventListener('click', autoActivateTTS, { passive: true, once: true });
-            document.addEventListener('keydown', autoActivateTTS, { passive: true, once: true });
-            
-            // También intentar después de un delay corto
-            setTimeout(() => {
-                if (!this.iosTTSActivated) {
-                    console.log('⏰ Intentando activación automática después de 2 segundos...');
-                    activateIOSTTS();
+
+            // También intentar activar en visibilitychange (cuando la app vuelve al foco)
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && !this.iosTTSActivated) {
+                    console.log('👁️ App visible, intentando activar TTS...');
+                    setTimeout(() => {
+                        if (!this.iosTTSActivated) {
+                            activateIOSTTS();
+                        }
+                    }, 100);
                 }
-            }, 2000);
-            
-            // Intentar activación más agresiva después de 5 segundos
-            setTimeout(() => {
-                if (!this.iosTTSActivated) {
-                    console.log('🔄 Segundo intento de activación automática...');
-                    activateIOSTTS();
-                }
-            }, 5000);
-            
+            });
+
             console.log('🍎📱 TTS iOS configurado para iPhone 14+. Esperando primera interacción del usuario...');
             console.log('📝 Eventos escuchando:', userInteractionEvents);
             resolve();
@@ -724,7 +702,7 @@ class SpeechManager {
                 console.warn('🎤 Web Speech API no disponible');
                 return resolve(null);
             }
-            
+
             const rec = new SpeechRecognition();
             this.recognition = rec;
 
@@ -746,15 +724,16 @@ class SpeechManager {
 
             const timeoutMs = Math.max(5000, (CONFIG.SPEECH.RECOGNITION_TIMEOUT || 8000), 12000);
             const timer = setTimeout(() => {
+                console.warn('🎤 Timeout de reconocimiento');
                 finish(null);
             }, timeoutMs);
 
             // Diagnóstico útil
-            rec.onaudiostart = () => console.log('Audio start');
-            rec.onsoundstart = () => console.log('Sound start');
-            rec.onspeechstart = () => console.log('Speech start');
-            rec.onsoundend = () => console.log('Sound end');
-            rec.onnomatch = () => console.warn('No match');
+            rec.onaudiostart = () => console.log('🎤 onaudiostart');
+            rec.onsoundstart = () => console.log('🎤 onsoundstart');
+            rec.onspeechstart = () => console.log('🎤 onspeechstart');
+            rec.onsoundend = () => console.log('🎤 onsoundend');
+            rec.onnomatch = () => console.warn('🎤 onnomatch');
 
             rec.onresult = (event) => {
                 clearTimeout(timer);
@@ -762,7 +741,7 @@ class SpeechManager {
                 try {
                     if (event.results && event.results.length > 0) {
                         text = (event.results[0][0]?.transcript || '').trim();
-                        console.log('Texto reconocido:', text);
+                        console.log('🎤 Texto reconocido:', text);
                     }
                 } catch (_) { }
                 finish(text && text.length > 0 ? text : null);
@@ -770,23 +749,23 @@ class SpeechManager {
 
             rec.onerror = (e) => {
                 clearTimeout(timer);
-                console.warn('Recognition error:', e?.error || e);
+                console.warn('🎤 recognition.onerror:', e?.error || e);
                 finish(null);
             };
 
             rec.onend = () => {
                 clearTimeout(timer);
                 if (!settled) {
-                    console.log('Reconocimiento terminado sin resultado');
+                    console.log('🎤 Reconocimiento terminado sin resultado');
                     finish(null);
                 }
             };
 
             try {
-                console.log('Iniciando reconocimiento de voz...');
+                console.log('🎤 Iniciando reconocimiento de voz...');
                 rec.start();
             } catch (err) {
-                console.warn('Error al iniciar reconocimiento:', err?.message || err);
+                console.warn('🎤 Error al iniciar reconocimiento:', err?.message || err);
                 clearTimeout(timer);
                 finish(null);
             }
@@ -795,6 +774,11 @@ class SpeechManager {
 
     async listenIOSFallback() {
         console.log('Usando transcripción web para iOS...');
+
+        if (!this.mediaRecorder || !this.stream) {
+            console.error('❌ MediaRecorder no configurado');
+            return null;
+        }
 
         return new Promise((resolve) => {
             this.audioChunks = [];
@@ -809,16 +793,16 @@ class SpeechManager {
             this.mediaRecorder.onstop = async () => {
                 clearTimeout(timeout);
                 this.isListening = false;
-                
+
                 if (this.audioChunks.length > 0) {
                     try {
                         // Crear blob de audio
                         const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
                         console.log('🎤 Audio capturado:', audioBlob.size, 'bytes');
-                        
+
                         // Intentar transcripción con Web Speech API si está disponible
                         const transcript = await this.transcribeAudioBlob(audioBlob);
-                        
+
                         if (transcript) {
                             resolve(transcript);
                         } else {
@@ -859,15 +843,15 @@ class SpeechManager {
             // Convertir blob a URL para reproducción
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
-            
+
             // Esta es una aproximación - Web Speech API no acepta blobs directamente
             // pero podemos simular el comportamiento
             console.log('🔄 Intentando transcripción experimental...');
-            
+
             // Por ahora retornamos null para usar el fallback manual
             URL.revokeObjectURL(audioUrl);
             return null;
-            
+
         } catch (error) {
             console.warn('⚠️ Transcripción experimental falló:', error);
             return null;
@@ -890,7 +874,7 @@ class SpeechManager {
                 justify-content: center;
                 z-index: 10000;
             `;
-            
+
             const content = document.createElement('div');
             content.style.cssText = `
                 background: #2a2a2a;
@@ -900,7 +884,7 @@ class SpeechManager {
                 width: 400px;
                 text-align: center;
             `;
-            
+
             content.innerHTML = `
                 <h3 style="color: #fff; margin-bottom: 15px;">🎤 Comando de Voz</h3>
                 <p style="color: #ccc; margin-bottom: 15px;">Audio grabado. Escribe lo que dijiste:</p>
@@ -911,32 +895,32 @@ class SpeechManager {
                     <button id="voiceCancel" style="background: #f44336; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Cancelar</button>
                 </div>
             `;
-            
+
             modal.appendChild(content);
             document.body.appendChild(modal);
-            
+
             const input = content.querySelector('#voiceInput');
             const okBtn = content.querySelector('#voiceOk');
             const cancelBtn = content.querySelector('#voiceCancel');
-            
+
             // Enfocar input
             setTimeout(() => input.focus(), 100);
-            
+
             const cleanup = () => {
                 document.body.removeChild(modal);
             };
-            
+
             okBtn.onclick = () => {
                 const text = input.value.trim();
                 cleanup();
                 resolve(text || null);
             };
-            
+
             cancelBtn.onclick = () => {
                 cleanup();
                 resolve(null);
             };
-            
+
             input.onkeypress = (e) => {
                 if (e.key === 'Enter') {
                     okBtn.click();
@@ -982,7 +966,7 @@ class SpeechManager {
                     this.isSpeaking = true;
                     console.log('🗣️ Iniciando síntesis de voz:', text.substring(0, 50) + '...');
                 };
-                
+
                 this.currentUtterance.onend = () => {
                     clearTimeout(safetyTimeout);
                     this.isSpeaking = false;
@@ -990,7 +974,7 @@ class SpeechManager {
                     console.log('✅ Síntesis de voz completada');
                     resolve(true);
                 };
-                
+
                 this.currentUtterance.onerror = (e) => {
                     clearTimeout(safetyTimeout);
                     this.isSpeaking = false;
@@ -1019,7 +1003,7 @@ class SpeechManager {
 
     async speakIOS(text) {
         console.log('🍎📱 Iniciando síntesis de voz en iOS Safari (iPhone 17 Pro):', text.substring(0, 50) + '...');
-        
+
         // Debug del estado actual
         console.log('🔍 Estado TTS iOS:', {
             activated: this.iosTTSActivated,
@@ -1031,7 +1015,7 @@ class SpeechManager {
                 paused: this.synthesis?.paused
             }
         });
-        
+
         // VERIFICACIÓN CRÍTICA: iOS puede "desactivar" TTS aleatoriamente
         // Verificar si synthesis sigue funcionando
         if (this.iosTTSActivated && this.synthesis) {
@@ -1049,23 +1033,23 @@ class SpeechManager {
                 this.iosTTSReady = false;
             }
         }
-        
+
         // Si TTS no está activado o se desactivó, intentar reactivarlo
         if (!this.iosTTSActivated) {
             console.log('🔄 TTS no activado/desactivado, intentando (re)activación automática...');
             await this.forceActivateIOSTTS();
-            
+
             // Si aún no está activado, guardar para después y mostrar mensaje claro
             if (!this.iosTTSActivated) {
                 console.log('🗓️ TTS no activado aún, guardando para después de la interacción del usuario');
                 this.pendingSpeech = text;
                 this.showIOSTTSNotice();
-                
+
                 // Mostrar mensaje visual de que el asistente quiere hablar
                 if (window.app && window.app.showStatus) {
                     window.app.showStatus('🔊 El asistente quiere hablar. Toca "Activar Audio" para escucharlo.', 5000);
                 }
-                
+
                 return false;
             }
         }
@@ -1084,11 +1068,11 @@ class SpeechManager {
                     console.log('🧹 Limpiando cola de síntesis...');
                     this.synthesis.cancel();
                 }
-                
+
                 // Pausa más larga para iPhone 17 Pro (más tiempo que iPhone 14)
                 setTimeout(() => {
                     console.log('🍎 Creando utterance para iPhone 17 Pro...');
-                    
+
                     // VERIFICACIÓN ADICIONAL: Asegurar que synthesis sigue disponible
                     if (!this.synthesis || typeof this.synthesis.speak !== 'function') {
                         console.error('🍎❌ Synthesis no disponible, reintentando...');
@@ -1098,7 +1082,7 @@ class SpeechManager {
                         resolve(false);
                         return;
                     }
-                    
+
                     this.currentUtterance = new SpeechSynthesisUtterance(text);
 
                     // Configuración específica para iOS
@@ -1113,7 +1097,7 @@ class SpeechManager {
                     this.currentUtterance.rate = Math.min(CONFIG.SPEECH.VOICE_RATE, 0.9); // Más conservador
                     this.currentUtterance.pitch = CONFIG.SPEECH.VOICE_PITCH;
                     this.currentUtterance.volume = Math.max(CONFIG.SPEECH.VOICE_VOLUME, 0.9); // Asegurar volumen audible
-                    
+
                     console.log('🔊 Configuración TTS iPhone 17 Pro:', {
                         rate: this.currentUtterance.rate,
                         pitch: this.currentUtterance.pitch,
@@ -1123,7 +1107,7 @@ class SpeechManager {
 
                     let hasStarted = false;
                     let hasEnded = false;
-                    
+
                     // Timeout de seguridad más largo para iPhone 17 Pro
                     const safetyTimeout = setTimeout(() => {
                         if (!hasStarted && !hasEnded) {
@@ -1144,7 +1128,7 @@ class SpeechManager {
                         this.iosTTSReady = false;
                         console.log('🍎🗣️ TTS iniciado exitosamente en iPhone 17 Pro:', text.substring(0, 50) + '...');
                     };
-                    
+
                     this.currentUtterance.onend = () => {
                         hasEnded = true;
                         clearTimeout(safetyTimeout);
@@ -1154,7 +1138,7 @@ class SpeechManager {
                         console.log('🍎✅ TTS completado exitosamente en iPhone 17 Pro');
                         resolve(true);
                     };
-                    
+
                     this.currentUtterance.onerror = (e) => {
                         hasEnded = true;
                         clearTimeout(safetyTimeout);
@@ -1203,34 +1187,34 @@ class SpeechManager {
      */
     async forceActivateIOSTTS() {
         if (!this.isIOSSafari || this.iosTTSActivated) return true;
-        
+
         try {
             console.log('🔄 Forzando activación de TTS en iOS Safari...');
-            
+
             // Limpiar cualquier síntesis pendiente primero
             if (this.synthesis.speaking || this.synthesis.pending) {
                 this.synthesis.cancel();
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
-            
+
             // Crear utterance de activación más audible para iOS
             const activationUtterance = new SpeechSynthesisUtterance('Activando audio');
             activationUtterance.volume = 0.1; // Muy bajo pero audible
             activationUtterance.rate = 2; // Rápido
             activationUtterance.pitch = 0.5;
-            
+
             // Seleccionar voz en español si está disponible
             const voices = this.synthesis.getVoices();
-            const spanishVoice = voices.find(voice => 
+            const spanishVoice = voices.find(voice =>
                 voice.lang.startsWith('es') || voice.lang.includes('ES')
             );
             if (spanishVoice) {
                 activationUtterance.voice = spanishVoice;
             }
-            
+
             return new Promise((resolve) => {
                 let resolved = false;
-                
+
                 const timeout = setTimeout(() => {
                     if (!resolved) {
                         resolved = true;
@@ -1240,7 +1224,7 @@ class SpeechManager {
                         resolve(true);
                     }
                 }, 2000);
-                
+
                 activationUtterance.onstart = () => {
                     if (!resolved) {
                         resolved = true;
@@ -1251,7 +1235,7 @@ class SpeechManager {
                         resolve(true);
                     }
                 };
-                
+
                 activationUtterance.onend = () => {
                     if (!resolved) {
                         resolved = true;
@@ -1262,7 +1246,7 @@ class SpeechManager {
                         resolve(true);
                     }
                 };
-                
+
                 activationUtterance.onerror = (e) => {
                     if (!resolved) {
                         resolved = true;
@@ -1274,7 +1258,7 @@ class SpeechManager {
                         resolve(false);
                     }
                 };
-                
+
                 try {
                     console.log('🍎 Ejecutando utterance de activación...');
                     this.synthesis.speak(activationUtterance);
@@ -1302,7 +1286,7 @@ class SpeechManager {
             this.synthesis.cancel();
             this.isSpeaking = false;
             this.currentUtterance = null;
-            
+
             // Restablecer estado para iOS
             if (this.isIOSSafari) {
                 this.iosTTSReady = true;
@@ -1312,20 +1296,20 @@ class SpeechManager {
 
     dispose() {
         this.stopSpeaking();
-        
+
         // Limpiar recursos de iOS
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
         }
-        
+
         if (this.mediaRecorder) {
             if (this.mediaRecorder.state === 'recording') {
                 this.mediaRecorder.stop();
             }
             this.mediaRecorder = null;
         }
-        
+
         this.isInitialized = false;
     }
 }
@@ -1618,7 +1602,7 @@ class Model3DManager {
             this.renderer.xr.enabled = true;
         }
         // Ensure full transparency in AR
-        try { this.renderer.domElement.style.backgroundColor = 'transparent'; } catch (_) {}
+        try { this.renderer.domElement.style.backgroundColor = 'transparent'; } catch (_) { }
     }
 
     setupScene() {
@@ -1730,7 +1714,7 @@ class Model3DManager {
             const isChrome = /Chrome/i.test(navigator.userAgent);
             const isFirefox = /Firefox/i.test(navigator.userAgent);
             const isBrave = /Brave/i.test(navigator.userAgent) || (navigator.brave && navigator.brave.isBrave);
-            
+
             console.log('📱 Dispositivo detectado:', {
                 isAndroid,
                 isChrome,
@@ -1756,7 +1740,7 @@ class Model3DManager {
                 console.warn('⚠️ Error verificando soporte AR:', error);
                 supported = false;
             }
-            
+
             if (!supported) {
                 console.warn('⚠️ Sesión immersive-ar no soportada');
                 if (isAndroid) {
@@ -1775,24 +1759,24 @@ class Model3DManager {
             // Request AR session con configuración optimizada para Android
             console.log('🕶️ Solicitando sesión WebXR immersive-ar...');
             this.renderer.xr.setReferenceSpaceType?.('local');
-            
+
             // Configuración base más conservadora para Android
             const sessionInit = {
                 requiredFeatures: [],
                 optionalFeatures: ['hit-test', 'local-floor', 'bounded-floor', 'unbounded']
             };
-            
+
             // Añadir características adicionales solo si no es Android problemático
             if (!isAndroid || isChrome) {
                 sessionInit.optionalFeatures.push('light-estimation', 'anchors');
             }
-            
+
             // Dom overlay solo en navegadores compatibles
             if (useDomOverlay && !isFirefox && !isBrave) {
                 sessionInit.optionalFeatures.push('dom-overlay');
                 sessionInit.domOverlay = { root: document.body };
             }
-            
+
             console.log('⚙️ Configuración de sesión:', sessionInit);
             this.xrSession = await navigator.xr.requestSession('immersive-ar', sessionInit);
 
@@ -1810,7 +1794,7 @@ class Model3DManager {
             console.log('✅ Sesión WebXR iniciada exitosamente!');
             console.log('🌈 environmentBlendMode:', this.xrSession.environmentBlendMode);
             console.log('🛠️ inputSources:', this.xrSession.inputSources?.length || 0);
-            
+
             // Verificar modo de mezcla
             if (this.xrSession.environmentBlendMode && this.xrSession.environmentBlendMode === 'opaque') {
                 console.warn('⚠️ Modo "opaque" detectado (sin passthrough de cámara)');
@@ -1819,7 +1803,7 @@ class Model3DManager {
                     // En Android, a veces funciona a pesar del modo opaque
                 } else {
                     console.warn('🚫 Usando fallback por modo opaque');
-                    try { await this.stopARSession(); } catch (_) {}
+                    try { await this.stopARSession(); } catch (_) { }
                     return false;
                 }
             }
@@ -1834,16 +1818,16 @@ class Model3DManager {
                         offsetRay: new XRRay()
                     });
                 } else {
-                    hitTestSource = await this.xrSession.requestHitTestSource({ 
-                        space: this.xrViewerSpace 
+                    hitTestSource = await this.xrSession.requestHitTestSource({
+                        space: this.xrViewerSpace
                     });
                 }
             } catch (e) {
                 console.warn('⚠️ requestHitTestSource falló:', e);
                 try {
                     // Fallback sin offsetRay
-                    hitTestSource = await this.xrSession.requestHitTestSource({ 
-                        space: this.xrViewerSpace 
+                    hitTestSource = await this.xrSession.requestHitTestSource({
+                        space: this.xrViewerSpace
                     });
                 } catch (e2) {
                     console.error('❌ No se pudo crear hit-test source:', e2);
@@ -1855,8 +1839,8 @@ class Model3DManager {
             // Transient input hit-test (para toques en pantalla) - opcional en Android
             try {
                 if (!isFirefox && !isBrave) {
-                    this.xrTransientHitTestSource = await this.xrSession.requestHitTestSourceForTransientInput({ 
-                        profile: 'generic-touchscreen' 
+                    this.xrTransientHitTestSource = await this.xrSession.requestHitTestSourceForTransientInput({
+                        profile: 'generic-touchscreen'
                     });
                 } else {
                     this.xrTransientHitTestSource = null;
@@ -1888,7 +1872,7 @@ class Model3DManager {
                             // Deshabilitar matrixAutoUpdate para que el anchor controle la posición
                             if (this.model) this.model.matrixAutoUpdate = false;
                             // Aviso UI
-                            try { this.canvas?.dispatchEvent(new CustomEvent('xr-anchored')); } catch (_) {}
+                            try { this.canvas?.dispatchEvent(new CustomEvent('xr-anchored')); } catch (_) { }
                         }).catch((e) => {
                             console.warn('No se pudo crear anchor, usando posición de retícula:', e);
                             if (this.model && this.reticle) {
@@ -1900,10 +1884,10 @@ class Model3DManager {
                                 this.model.updateMatrix();
                                 this.hasPlaced = true;
                                 if (this.reticle) this.reticle.visible = false;
-                                try { this.canvas?.dispatchEvent(new CustomEvent('xr-placed-no-anchor')); } catch (_) {}
+                                try { this.canvas?.dispatchEvent(new CustomEvent('xr-placed-no-anchor')); } catch (_) { }
                             }
                         });
-                        return;                    
+                        return;
                     }
 
                     // Si no tenemos hit anclable pero sí retícula visible, colocar en esa pose
@@ -1932,7 +1916,7 @@ class Model3DManager {
                             this.model.matrixAutoUpdate = false;
                             this.model.updateMatrix();
                             this.hasPlaced = true;
-                            try { this.canvas?.dispatchEvent(new CustomEvent('xr-placed-fallback')); } catch (_) {}
+                            try { this.canvas?.dispatchEvent(new CustomEvent('xr-placed-fallback')); } catch (_) { }
                         }
                     }
                 } catch (e) {
@@ -1962,7 +1946,7 @@ class Model3DManager {
             return true;
         } catch (err) {
             console.error('❌ startARSession error:', err);
-            
+
             // Mensajes específicos para Android
             if (isAndroid) {
                 if (err.name === 'NotSupportedError') {
@@ -1973,7 +1957,7 @@ class Model3DManager {
                     console.log('🚫 Android: Permisos denegados - permite cámara y sensores');
                 }
             }
-            
+
             return false;
         }
     }
@@ -1982,7 +1966,7 @@ class Model3DManager {
         try {
             if (this.xrSession) {
                 if (this._onXRSelect) {
-                    try { this.xrSession.removeEventListener('select', this._onXRSelect); } catch (_) {}
+                    try { this.xrSession.removeEventListener('select', this._onXRSelect); } catch (_) { }
                 }
                 await this.xrSession.end();
             }
@@ -2024,7 +2008,7 @@ class Model3DManager {
                     this.reticle.matrix.fromArray(pose.transform.matrix);
                     this._xrHits++;
                     // Aviso UI: se detecta plano
-                    try { this.canvas?.dispatchEvent(new CustomEvent('xr-plane-detected')); } catch (_) {}
+                    try { this.canvas?.dispatchEvent(new CustomEvent('xr-plane-detected')); } catch (_) { }
                 }
             } else if (this.reticle) {
                 // If no hits, try to place reticle 1.5m in front of the camera for visual confirmation
@@ -2088,7 +2072,7 @@ class Model3DManager {
                     try {
                         this.ui.arStatus.classList.remove('hidden');
                         this.ui.arStatus.textContent = 'Sin plano: toca para colocar al frente o mueve el teléfono';
-                    } catch (_) {}
+                    } catch (_) { }
                 }
             }
             // Only report once
@@ -2509,7 +2493,7 @@ class VirtualAssistantApp {
 
             camera: document.getElementById('camera'),
             model3dCanvas: document.getElementById('model3dCanvas'),
-            
+
             // iOS TTS Notice
             iosTTSNotice: document.getElementById('iosTTSNotice')
         };
@@ -2562,9 +2546,9 @@ class VirtualAssistantApp {
         }
     }
 
-/**
- * Solicitar permisos - MODIFICADO para iOS
- */
+    /**
+     * Solicitar permisos - MODIFICADO para iOS
+     */
     async requestPermissions() {
         try {
             this.updatePermissionStatus('Inicializando...');
@@ -2582,7 +2566,7 @@ class VirtualAssistantApp {
             console.log('🎤 Iniciando configuración de voz...');
             const speechOk = await this.speech.init();
             console.log('🎤 Speech init resultado:', speechOk);
-            
+
             if (!speechOk) {
                 const reason = this.speech?.unsupportedReason ? this.speech.unsupportedReason : 'Voz no disponible';
                 console.log('⚠️ Speech falló:', reason);
@@ -2697,9 +2681,9 @@ class VirtualAssistantApp {
             const isChrome = /Chrome/i.test(navigator.userAgent);
             const isFirefox = /Firefox/i.test(navigator.userAgent);
             const isBrave = /Brave/i.test(navigator.userAgent) || (navigator.brave && navigator.brave.isBrave);
-            
+
             console.log('🚀 Iniciando modo AR...');
-            
+
             // Force fallback path if configured
             if (CONFIG && CONFIG.AR && CONFIG.AR.FORCE_FALLBACK) {
                 console.warn('⚙️ FORCE_FALLBACK activo: usando cámara HTML.');
@@ -2712,6 +2696,7 @@ class VirtualAssistantApp {
             if (this.model3dManager) {
                 this.model3dManager.setVisible(true);
                 this.model3dManager.setARMode(true);
+
                 console.log('🔍 Intentando WebXR AR...');
                 xrOk = await this.model3dManager.startARSession();
             }
@@ -2722,21 +2707,22 @@ class VirtualAssistantApp {
                 if (this.ui.camera) this.ui.camera.style.display = 'none';
                 if (this.model3dManager) this.model3dManager.enableTapPlacement(false);
                 if (this.ui.arStatus) this.ui.arStatus.textContent = 'WebXR AR activo';
-                
+
                 // Mostrar mensaje de éxito
                 this.showARSuccessMessage();
             } else {
-                // Fallback para Android y otros navegadores
-                console.log('🔄 Usando fallback AR para Android...');
-                
-                // En Android, detener WebXR si se había iniciado
-                if (isAndroid && this.model3dManager && this.model3dManager.xrSession) {
-                    console.log('🤖 Deteniendo WebXR en Android para usar fallback');
-                    await this.model3dManager.stopARSession();
+                // En Android, siempre usar fallback aunque WebXR se "inicie"
+                if (isAndroid && xrOk) {
+                    console.log('🤖 Android detectado: forzando fallback para mejor compatibilidad');
+                    // Detener WebXR si se había iniciado
+                    if (this.model3dManager && this.model3dManager.xrSession) {
+                        await this.model3dManager.stopARSession();
+                    }
                 }
-                
-                // Determinar razón del fallback
-                let fallbackReason = 'WebXR no disponible, usando cámara HTML';
+                // Fallback para Android y otros navegadores
+                console.log('🔄 WebXR no disponible, usando fallback...');
+
+                let fallbackReason = 'Fallback AR';
                 if (isAndroid) {
                     if (isChrome) {
                         fallbackReason = 'AR optimizado para Chrome Android';
@@ -2748,7 +2734,7 @@ class VirtualAssistantApp {
                         fallbackReason = 'AR optimizado para Android';
                     }
                 }
-                
+
                 await this.setupFallbackAR(fallbackReason);
                 this.showARFallbackMessage(isAndroid, isChrome, isFirefox, isBrave);
             }
@@ -2772,54 +2758,43 @@ class VirtualAssistantApp {
     }
 
     async setupFallbackAR(statusText) {
-        console.log('Configurando AR con cámara HTML para Android...');
-        
-        try {
-            // Asegurar que la cámara esté funcionando
-            if (this.cameraManager && this.cameraManager.isInitialized) {
-                console.log('Usando cámara existente para AR');
-            } else {
-                console.log('Iniciando nueva cámara para AR...');
-                if (!this.cameraManager) {
-                    this.cameraManager = new CameraManager();
-                }
+        console.log('Configurando AR con cámara HTML...');
+
+        // Crear e inicializar CameraManager si no existe
+        if (!this.cameraManager) {
+            console.log('Creando CameraManager...');
+            this.cameraManager = new CameraManager();
+        }
+
+        // Asegurar que la cámara esté iniciada
+        if (!this.cameraManager.isInitialized) {
+            console.log('Iniciando cámara para fallback...');
+            try {
                 await this.cameraManager.init();
-            }
-            
-            // Mostrar cámara HTML
-            if (this.ui.camera) {
-                this.ui.camera.style.display = 'block';
-                this.ui.camera.style.zIndex = '1';
-                console.log('Cámara HTML visible para Android AR');
-            }
-            
-            // Configurar modelo 3D para overlay
-            if (this.model3dManager) {
-                this.model3dManager.setVisible(true);
-                this.model3dManager.setARMode(true);
-                this.model3dManager.enableTapPlacement(true);
-                
-                // Asegurar que el canvas esté por encima de la cámara
-                if (this.model3dManager.canvas) {
-                    this.model3dManager.canvas.style.zIndex = '2';
-                    this.model3dManager.canvas.style.pointerEvents = 'auto';
-                }
-                console.log('Modelo 3D configurado para Android AR');
-            }
-            
-            if (this.ui.arStatus) this.ui.arStatus.textContent = statusText;
-            
-            console.log('✅ Fallback AR configurado para Android');
-            
-        } catch (error) {
-            console.error('❌ Error configurando fallback AR:', error);
-            // Mostrar mensaje de error al usuario
-            if (this.ui.arStatus) {
-                this.ui.arStatus.textContent = 'Error: No se pudo acceder a la cámara';
+                console.log('Cámara iniciada para fallback');
+            } catch (error) {
+                console.error('❌ Error iniciando cámara:', error);
+                // Continuar sin cámara
             }
         }
+
+        if (this.ui.camera) {
+            this.ui.camera.style.display = 'block';
+            console.log('Cámara HTML visible');
+        }
+
+        if (this.model3dManager) {
+            this.model3dManager.setVisible(true);
+            this.model3dManager.setARMode(true); // Usar modo AR para fondo transparente
+            this.model3dManager.enableTapPlacement(true);
+            console.log('Modelo 3D configurado para fallback');
+        }
+
+        if (this.ui.arStatus) this.ui.arStatus.textContent = statusText;
+
+        console.log('Fallback AR configurado completamente');
     }
-    
+
     showARSuccessMessage() {
         if (this.ui.arResponse) {
             this.ui.arResponse.innerHTML = `
@@ -2830,12 +2805,12 @@ class VirtualAssistantApp {
             `;
         }
     }
-    
+
     showARFallbackMessage(isAndroid, isChrome, isFirefox, isBrave) {
         if (this.ui.arResponse) {
             let message = '📱 Realidad Aumentada Activada';
             let instructions = 'Toca la pantalla para colocar el avatar en tu espacio.';
-            
+
             this.ui.arResponse.innerHTML = `
                 <div style="color: #4CAF50; font-size: 16px; margin-bottom: 10px;">
                     ${message}
@@ -3038,6 +3013,7 @@ class VirtualAssistantApp {
         if (this.ui.chatModal) {
             this.ui.chatModal.style.display = 'none';
         }
+
         if (this.speech) {
             this.speech.stopSpeaking();
         }
@@ -3070,7 +3046,7 @@ class VirtualAssistantApp {
 
     async processMessage(message, isAR = false) {
         this.isProcessing = true;
-        this.updateChatStatus('Preguntando a Gemini 2.0...');
+        this.updateChatStatus('🤔 Preguntando a Gemini 2.0...');
 
         if ((this.isInPreview || this.isInAR) && this.model3dManager) {
             this.model3dManager.playThinkingAnimation();
@@ -3096,7 +3072,7 @@ class VirtualAssistantApp {
 
             if (this.speech) {
                 const speechResult = this.speech.speak(response);
-                
+
                 // Si es iOS Safari y no se pudo hablar (TTS no activado), mostrar indicador
                 if (this.speech.isIOSSafari && !speechResult) {
                     this.checkAndShowIOSTTSNotice();
@@ -3126,7 +3102,7 @@ class VirtualAssistantApp {
 
             if (this.speech) {
                 const speechResult = this.speech.speak(`${fallback} ${suggestions}`);
-                
+
                 // Si es iOS Safari y no se pudo hablar (TTS no activado), mostrar indicador
                 if (this.speech.isIOSSafari && !speechResult) {
                     this.checkAndShowIOSTTSNotice();
@@ -3156,13 +3132,13 @@ class VirtualAssistantApp {
         if (!this.speech.isInitialized) {
             const reason = this.speech.unsupportedReason || 'Reconocimiento de voz no disponible en este navegador o contexto.';
             this.updateChatStatus(`❌ ${reason}`);
-            
+
             return;
         }
 
         try {
             console.log('🎤 Iniciando reconocimiento...');
-            
+
             if (this.speech.isIOSSafari) {
                 this.updateChatStatus('🎤 Escuchando...');
             } else {
@@ -3192,7 +3168,7 @@ class VirtualAssistantApp {
 
         } catch (error) {
             console.error('❌ Error voz:', error);
-            
+
             if (this.speech.isIOSSafari) {
                 this.updateChatStatus('❌ Error de audio - Intenta de nuevo');
             } else {
@@ -3210,7 +3186,7 @@ class VirtualAssistantApp {
 
         try {
             console.log('🤖 Mostrando mensaje de bienvenida automático...');
-            
+
             const welcomeMsg = await this.gemini.getWelcomeMessage();
 
             // Mostrar mensaje visual en el status
@@ -3220,7 +3196,7 @@ class VirtualAssistantApp {
             if (this.speech) {
                 console.log('🗣️ Intentando hablar mensaje de bienvenida...');
                 const speechResult = await this.speech.speak(welcomeMsg);
-                
+
                 if (!speechResult && this.speech.isIOSSafari) {
                     // Si no se pudo hablar en iOS, mostrar indicador
                     console.log('🍎 TTS no activado en iOS, mostrando indicador...');
@@ -3231,7 +3207,7 @@ class VirtualAssistantApp {
             // Animar el modelo si está visible
             if (this.isInPreview && this.model3dManager) {
                 this.model3dManager.playTalkingAnimation();
-                
+
                 // Volver a idle después de hablar
                 setTimeout(() => {
                     if (this.model3dManager) {
@@ -3245,7 +3221,7 @@ class VirtualAssistantApp {
             // Mostrar mensaje de bienvenida básico como fallback
             const fallbackMsg = '¡Hola! Soy tu asistente virtual con IA Gemini 2.0. ¿En qué puedo ayudarte?';
             this.showStatus(`🤖 ${fallbackMsg}`, 6000);
-            
+
             if (this.speech) {
                 this.speech.speak(fallbackMsg);
             }
@@ -3317,7 +3293,7 @@ class VirtualAssistantApp {
 
     showStatus(message, duration = 3000) {
         console.log('📢 Status:', message);
-        
+
         // Mostrar en el status display si existe
         if (this.ui.statusDisplay) {
             const statusContent = this.ui.statusDisplay.querySelector('.status-content');
@@ -3334,9 +3310,9 @@ class VirtualAssistantApp {
                     font-size: 14px;
                     animation: fadeInOut 0.3s ease-in;
                 `;
-                
+
                 statusContent.appendChild(statusMsg);
-                
+
                 // Auto-remover después del duration
                 setTimeout(() => {
                     if (statusMsg.parentNode) {
@@ -3350,7 +3326,7 @@ class VirtualAssistantApp {
                 }, duration);
             }
         }
-        
+
         // También mostrar en chat status si está visible
         if (this.ui.chatStatus && this.ui.chatModal && this.ui.chatModal.style.display !== 'none') {
             this.updateChatStatus(message);
@@ -3373,18 +3349,18 @@ class VirtualAssistantApp {
     // ===== iOS TTS INDICATOR MANAGEMENT =====
     showIOSTTSNotice() {
         if (!this.speech?.isIOSSafari || this.speech?.iosTTSActivated) return;
-        
+
         console.log('🍎📢 Mostrando indicador de activación TTS para iOS');
         if (this.ui.iosTTSNotice) {
             this.ui.iosTTSNotice.classList.remove('hidden');
-            
+
             // Agregar event listener al botón de activación
             const activateBtn = this.ui.iosTTSNotice.querySelector('.tts-activate-btn');
             if (activateBtn) {
                 // Remover listeners anteriores
                 activateBtn.replaceWith(activateBtn.cloneNode(true));
                 const newActivateBtn = this.ui.iosTTSNotice.querySelector('.tts-activate-btn');
-                
+
                 newActivateBtn.onclick = async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -3393,13 +3369,13 @@ class VirtualAssistantApp {
                     newActivateBtn.disabled = true;
                     await this.activateTTSFromUserGesture();
                 };
-                
+
                 // También agregar eventos táctiles para iOS
                 newActivateBtn.ontouchstart = (e) => {
                     e.preventDefault();
                     newActivateBtn.style.transform = 'scale(0.95)';
                 };
-                
+
                 newActivateBtn.ontouchend = async (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -3410,7 +3386,7 @@ class VirtualAssistantApp {
                     await this.activateTTSFromUserGesture();
                 };
             }
-            
+
             // También permitir activación tocando el modal completo
             this.ui.iosTTSNotice.onclick = async (e) => {
                 if (e.target === this.ui.iosTTSNotice || e.target.classList.contains('tts-notice-content')) {
@@ -3418,40 +3394,32 @@ class VirtualAssistantApp {
                     await this.activateTTSFromUserGesture();
                 }
             };
-            
-            // Auto-ocultar después de 3 segundos si no se activa (más rápido)
+
+            // Auto-ocultar después de 10 segundos si no se activa
             setTimeout(() => {
                 if (!this.speech?.iosTTSActivated && this.ui.iosTTSNotice && !this.ui.iosTTSNotice.classList.contains('hidden')) {
-                    console.log('⏰ Auto-ocultando indicador TTS después de 3s');
+                    console.log('⏰ Auto-ocultando indicador TTS después de 10s');
                     this.hideIOSTTSNotice();
                 }
-            }, 3000);
-            
-            // Intentar activación automática inmediata
-            setTimeout(async () => {
-                if (!this.speech?.iosTTSActivated) {
-                    console.log('🤖 Intentando activación automática del modal...');
-                    await this.activateTTSFromUserGesture();
-                }
-            }, 500);
+            }, 10000);
         }
     }
 
     async activateTTSFromUserGesture() {
         try {
             console.log('🍎🎤 Activando TTS desde gesto del usuario...');
-            
+
             if (this.speech && this.speech.isIOSSafari) {
                 // Mostrar feedback visual inmediato
                 this.showStatus('🔊 Activando audio del asistente...');
-                
+
                 // Forzar activación inmediata
                 const activated = await this.speech.forceActivateIOSTTS();
-                
+
                 if (activated) {
                     console.log('✅ TTS activado exitosamente desde gesto del usuario');
                     this.showStatus('✅ Audio del asistente activado', 2000);
-                    
+
                     // Si hay speech pendiente, ejecutarlo
                     if (this.speech.pendingSpeech) {
                         console.log('🗣️ Ejecutando speech pendiente:', this.speech.pendingSpeech.substring(0, 50) + '...');
@@ -3471,9 +3439,9 @@ class VirtualAssistantApp {
                     this.showStatus('⚠️ No se pudo activar el audio. Intenta de nuevo.', 3000);
                 }
             }
-            
+
             this.hideIOSTTSNotice();
-            
+
         } catch (error) {
             console.error('❌ Error activando TTS desde gesto:', error);
             this.showStatus('❌ Error activando audio. Intenta de nuevo.', 3000);
