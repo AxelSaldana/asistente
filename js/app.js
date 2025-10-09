@@ -746,16 +746,15 @@ class SpeechManager {
 
             const timeoutMs = Math.max(5000, (CONFIG.SPEECH.RECOGNITION_TIMEOUT || 8000), 12000);
             const timer = setTimeout(() => {
-                console.warn('🎤 Timeout de reconocimiento');
                 finish(null);
             }, timeoutMs);
 
             // Diagnóstico útil
-            rec.onaudiostart = () => console.log('🎤 onaudiostart');
-            rec.onsoundstart = () => console.log('🎤 onsoundstart');
-            rec.onspeechstart = () => console.log('🎤 onspeechstart');
-            rec.onsoundend = () => console.log('🎤 onsoundend');
-            rec.onnomatch = () => console.warn('🎤 onnomatch');
+            rec.onaudiostart = () => console.log('Audio start');
+            rec.onsoundstart = () => console.log('Sound start');
+            rec.onspeechstart = () => console.log('Speech start');
+            rec.onsoundend = () => console.log('Sound end');
+            rec.onnomatch = () => console.warn('No match');
 
             rec.onresult = (event) => {
                 clearTimeout(timer);
@@ -763,7 +762,7 @@ class SpeechManager {
                 try {
                     if (event.results && event.results.length > 0) {
                         text = (event.results[0][0]?.transcript || '').trim();
-                        console.log('🎤 Texto reconocido:', text);
+                        console.log('Texto reconocido:', text);
                     }
                 } catch (_) { }
                 finish(text && text.length > 0 ? text : null);
@@ -771,23 +770,23 @@ class SpeechManager {
 
             rec.onerror = (e) => {
                 clearTimeout(timer);
-                console.warn('🎤 recognition.onerror:', e?.error || e);
+                console.warn('Recognition error:', e?.error || e);
                 finish(null);
             };
 
             rec.onend = () => {
                 clearTimeout(timer);
                 if (!settled) {
-                    console.log('🎤 Reconocimiento terminado sin resultado');
+                    console.log('Reconocimiento terminado sin resultado');
                     finish(null);
                 }
             };
 
             try {
-                console.log('🎤 Iniciando reconocimiento de voz...');
+                console.log('Iniciando reconocimiento de voz...');
                 rec.start();
             } catch (err) {
-                console.warn('🎤 Error al iniciar reconocimiento:', err?.message || err);
+                console.warn('Error al iniciar reconocimiento:', err?.message || err);
                 clearTimeout(timer);
                 finish(null);
             }
@@ -796,11 +795,6 @@ class SpeechManager {
 
     async listenIOSFallback() {
         console.log('Usando transcripción web para iOS...');
-        
-        if (!this.mediaRecorder || !this.stream) {
-            console.error('❌ MediaRecorder no configurado');
-            return null;
-        }
 
         return new Promise((resolve) => {
             this.audioChunks = [];
@@ -2718,7 +2712,6 @@ class VirtualAssistantApp {
             if (this.model3dManager) {
                 this.model3dManager.setVisible(true);
                 this.model3dManager.setARMode(true);
-                
                 console.log('🔍 Intentando WebXR AR...');
                 xrOk = await this.model3dManager.startARSession();
             }
@@ -2733,18 +2726,17 @@ class VirtualAssistantApp {
                 // Mostrar mensaje de éxito
                 this.showARSuccessMessage();
             } else {
-                // En Android, siempre usar fallback aunque WebXR se "inicie"
-                if (isAndroid && xrOk) {
-                    console.log('🤖 Android detectado: forzando fallback para mejor compatibilidad');
-                    // Detener WebXR si se había iniciado
-                    if (this.model3dManager && this.model3dManager.xrSession) {
-                        await this.model3dManager.stopARSession();
-                    }
-                }
                 // Fallback para Android y otros navegadores
-                console.log('🔄 WebXR no disponible, usando fallback...');
+                console.log('🔄 Usando fallback AR para Android...');
                 
-                let fallbackReason = 'Fallback AR';
+                // En Android, detener WebXR si se había iniciado
+                if (isAndroid && this.model3dManager && this.model3dManager.xrSession) {
+                    console.log('🤖 Deteniendo WebXR en Android para usar fallback');
+                    await this.model3dManager.stopARSession();
+                }
+                
+                // Determinar razón del fallback
+                let fallbackReason = 'WebXR no disponible, usando cámara HTML';
                 if (isAndroid) {
                     if (isChrome) {
                         fallbackReason = 'AR optimizado para Chrome Android';
@@ -2780,41 +2772,52 @@ class VirtualAssistantApp {
     }
 
     async setupFallbackAR(statusText) {
-        console.log('Configurando AR con cámara HTML...');
+        console.log('Configurando AR con cámara HTML para Android...');
         
-        // Crear e inicializar CameraManager si no existe
-        if (!this.cameraManager) {
-            console.log('Creando CameraManager...');
-            this.cameraManager = new CameraManager();
-        }
-        
-        // Asegurar que la cámara esté iniciada
-        if (!this.cameraManager.isInitialized) {
-            console.log('Iniciando cámara para fallback...');
-            try {
+        try {
+            // Asegurar que la cámara esté funcionando
+            if (this.cameraManager && this.cameraManager.isInitialized) {
+                console.log('Usando cámara existente para AR');
+            } else {
+                console.log('Iniciando nueva cámara para AR...');
+                if (!this.cameraManager) {
+                    this.cameraManager = new CameraManager();
+                }
                 await this.cameraManager.init();
-                console.log('Cámara iniciada para fallback');
-            } catch (error) {
-                console.error('❌ Error iniciando cámara:', error);
-                // Continuar sin cámara
+            }
+            
+            // Mostrar cámara HTML
+            if (this.ui.camera) {
+                this.ui.camera.style.display = 'block';
+                this.ui.camera.style.zIndex = '1';
+                console.log('Cámara HTML visible para Android AR');
+            }
+            
+            // Configurar modelo 3D para overlay
+            if (this.model3dManager) {
+                this.model3dManager.setVisible(true);
+                this.model3dManager.setARMode(true);
+                this.model3dManager.enableTapPlacement(true);
+                
+                // Asegurar que el canvas esté por encima de la cámara
+                if (this.model3dManager.canvas) {
+                    this.model3dManager.canvas.style.zIndex = '2';
+                    this.model3dManager.canvas.style.pointerEvents = 'auto';
+                }
+                console.log('Modelo 3D configurado para Android AR');
+            }
+            
+            if (this.ui.arStatus) this.ui.arStatus.textContent = statusText;
+            
+            console.log('✅ Fallback AR configurado para Android');
+            
+        } catch (error) {
+            console.error('❌ Error configurando fallback AR:', error);
+            // Mostrar mensaje de error al usuario
+            if (this.ui.arStatus) {
+                this.ui.arStatus.textContent = 'Error: No se pudo acceder a la cámara';
             }
         }
-        
-        if (this.ui.camera) {
-            this.ui.camera.style.display = 'block';
-            console.log('Cámara HTML visible');
-        }
-        
-        if (this.model3dManager) {
-            this.model3dManager.setVisible(true);
-            this.model3dManager.setARMode(true); // Usar modo AR para fondo transparente
-            this.model3dManager.enableTapPlacement(true);
-            console.log('Modelo 3D configurado para fallback');
-        }
-        
-        if (this.ui.arStatus) this.ui.arStatus.textContent = statusText;
-        
-        console.log('Fallback AR configurado completamente');
     }
     
     showARSuccessMessage() {
@@ -3035,7 +3038,6 @@ class VirtualAssistantApp {
         if (this.ui.chatModal) {
             this.ui.chatModal.style.display = 'none';
         }
-
         if (this.speech) {
             this.speech.stopSpeaking();
         }
@@ -3068,7 +3070,7 @@ class VirtualAssistantApp {
 
     async processMessage(message, isAR = false) {
         this.isProcessing = true;
-        this.updateChatStatus('🤔 Preguntando a Gemini 2.0...');
+        this.updateChatStatus('Preguntando a Gemini 2.0...');
 
         if ((this.isInPreview || this.isInAR) && this.model3dManager) {
             this.model3dManager.playThinkingAnimation();
