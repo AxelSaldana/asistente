@@ -4,7 +4,6 @@
     padding: 0;
     box-sizing: border-box;
 }
-
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     overflow: hidden;
@@ -12,6 +11,7 @@ body {
     color: #333;
     height: 100vh;
     width: 100vw;
+    
 }
 
 /* ===== ELEMENTOS MEDIA ===== */
@@ -24,6 +24,7 @@ body {
     width: 100vw;
     height: 100vh;
     object-fit: cover;
+    object-position: center;
     z-index: 1;
     display: none; /* Oculto por defecto */
 }

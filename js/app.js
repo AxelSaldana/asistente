@@ -115,6 +115,7 @@ class GeminiClient {
             const prompt = `Eres Avatar, un asistente virtual inteligente con IA Gemini 2.0.
 Respondes en español de forma natural y conversacional.
 Eres amigable, útil y entusiasta.
+No uses emojis en tus respuestas.
 
 Usuario: ${message}
 Avatar:`;
@@ -140,7 +141,7 @@ Avatar:`;
 
     async getWelcomeMessage() {
         try {
-            return await this.sendDirectToGemini('Saluda al usuario como Avatar, un asistente virtual con IA Gemini 2.0. Sé amigable y entusiasta, máximo 2 frases.');
+            return await this.sendDirectToGemini('Saluda al usuario como Avatar, un asistente virtual con IA Gemini 2.0. Sé amigable y entusiasta, máximo 2 frases. No uses emojis.');
         } catch (error) {
             throw new Error('No se pudo obtener mensaje de bienvenida');
         }
@@ -148,7 +149,7 @@ Avatar:`;
 
     async getARWelcomeMessage() {
         try {
-            return await this.sendDirectToGemini('El usuario activó el modo AR. Salúdalo con entusiasmo sobre la experiencia AR con Gemini 2.0. Máximo 2 frases.');
+            return await this.sendDirectToGemini('El usuario activó el modo AR. Salúdalo con entusiasmo sobre la experiencia AR con Gemini 2.0. Máximo 2 frases. No uses emojis.');
         } catch (error) {
             throw new Error('No se pudo obtener mensaje AR');
         }
@@ -642,7 +643,6 @@ class SpeechManager {
                     });
                 }, 5000);
             };
-            
             userInteractionEvents.forEach(eventType => {
                 document.addEventListener(eventType, onFirstInteraction, { passive: true });
             });
@@ -665,17 +665,39 @@ class SpeechManager {
             document.addEventListener('click', tryActivateOnButtonClick, { passive: true });
             document.addEventListener('touchend', tryActivateOnButtonClick, { passive: true });
             
-            // También intentar activar en visibilitychange (cuando la app vuelve al foco)
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden && !this.iosTTSActivated) {
-                    console.log('👁️ App visible, intentando activar TTS...');
-                    setTimeout(() => {
-                        if (!this.iosTTSActivated) {
-                            activateIOSTTS();
-                        }
-                    }, 100);
+            // ACTIVACIÓN AUTOMÁTICA MÁS AGRESIVA
+            // Intentar activar en cualquier interacción con la página
+            const autoActivateTTS = (event) => {
+                if (this.iosTTSActivated) return;
+                
+                console.log('👆 Cualquier interacción detectada, activando TTS automáticamente...');
+                setTimeout(() => {
+                    if (!this.iosTTSActivated) {
+                        activateIOSTTS();
+                    }
+                }, 50);
+            };
+            
+            // Escuchar CUALQUIER interacción del usuario
+            document.addEventListener('touchstart', autoActivateTTS, { passive: true, once: true });
+            document.addEventListener('click', autoActivateTTS, { passive: true, once: true });
+            document.addEventListener('keydown', autoActivateTTS, { passive: true, once: true });
+            
+            // También intentar después de un delay corto
+            setTimeout(() => {
+                if (!this.iosTTSActivated) {
+                    console.log('⏰ Intentando activación automática después de 2 segundos...');
+                    activateIOSTTS();
                 }
-            });
+            }, 2000);
+            
+            // Intentar activación más agresiva después de 5 segundos
+            setTimeout(() => {
+                if (!this.iosTTSActivated) {
+                    console.log('🔄 Segundo intento de activación automática...');
+                    activateIOSTTS();
+                }
+            }, 5000);
             
             console.log('🍎📱 TTS iOS configurado para iPhone 14+. Esperando primera interacción del usuario...');
             console.log('📝 Eventos escuchando:', userInteractionEvents);
@@ -2264,20 +2286,8 @@ class Model3DManager {
     enableControls() {
         if (!this.canvas) return;
 
-        // Mejorar soporte móvil: no permitir gestos del navegador
-        try {
-            this.canvas.style.touchAction = 'none'; // desactiva gestos por defecto (pinch/zoom del navegador)
-        } catch (_) { }
 
-        // Rueda del ratón: escala
-        this._wheelHandler = (e) => {
-            if (!this.model) return;
-            const delta = -e.deltaY * 0.001;
-            const currentScale = this.model.scale.x || 1;
-            const next = THREE.MathUtils.clamp(currentScale * (1 + delta), this._controls.scaleMin, this._controls.scaleMax);
-            this.model.scale.setScalar(next);
-        };
-        this.canvas.addEventListener('wheel', this._wheelHandler, { passive: true });
+        // Rueda del ratón deshabilitada
 
         // Arrastrar: rotar
         this._pointerDown = (e) => {
@@ -2325,12 +2335,7 @@ class Model3DManager {
                     this.model.rotation.y -= 0.1; break;
                 case 'e':
                     this.model.rotation.y += 0.1; break;
-                case '+':
-                case '=':
-                    this._scaleBy(1.1); break;
-                case '-':
-                case '_':
-                    this._scaleBy(0.9); break;
+                // Zoom con teclado deshabilitado
             }
         };
         window.addEventListener('keydown', this._keyHandler);
@@ -2344,8 +2349,6 @@ class Model3DManager {
         const centerPt = (t1, t2) => ({ x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 });
 
         this._touchStart = (e) => {
-            // Evitar scroll/zoom del navegador
-            if (e && typeof e.preventDefault === 'function') e.preventDefault();
             if (!this.model) return;
             this._touch.isTouching = true;
             if (e.touches.length === 1) {
@@ -2366,16 +2369,11 @@ class Model3DManager {
         };
 
         this._touchMove = (e) => {
-            if (e && typeof e.preventDefault === 'function') e.preventDefault();
             if (!this.model || !this._touch.isTouching) return;
             if (this._touch.isTwoFinger && e.touches.length >= 2) {
-                // Escala
+                // Solo pan (mover), sin escala
                 const t1 = e.touches[0];
                 const t2 = e.touches[1];
-                const dist = distance(t1, t2);
-                const scaleFactor = dist / Math.max(this._touch.startDist, 1);
-                this._scaleBy(scaleFactor);
-                this._touch.startDist = dist;
 
                 // Pan (mover)
                 const c = centerPt(t1, t2);
@@ -2417,12 +2415,6 @@ class Model3DManager {
         this.canvas.addEventListener('touchcancel', this._touchEnd, { passive: false });
     }
 
-    _scaleBy(factor) {
-        if (!this.model) return;
-        const current = this.model.scale.x || 1;
-        const next = THREE.MathUtils.clamp(current * factor, this._controls.scaleMin, this._controls.scaleMax);
-        this.model.scale.setScalar(next);
-    }
 
     dispose() {
         if (this.renderer) {
@@ -3395,13 +3387,21 @@ class VirtualAssistantApp {
                 }
             };
             
-            // Auto-ocultar después de 10 segundos si no se activa
+            // Auto-ocultar después de 3 segundos si no se activa (más rápido)
             setTimeout(() => {
                 if (!this.speech?.iosTTSActivated && this.ui.iosTTSNotice && !this.ui.iosTTSNotice.classList.contains('hidden')) {
-                    console.log('⏰ Auto-ocultando indicador TTS después de 10s');
+                    console.log('⏰ Auto-ocultando indicador TTS después de 3s');
                     this.hideIOSTTSNotice();
                 }
-            }, 10000);
+            }, 3000);
+            
+            // Intentar activación automática inmediata
+            setTimeout(async () => {
+                if (!this.speech?.iosTTSActivated) {
+                    console.log('🤖 Intentando activación automática del modal...');
+                    await this.activateTTSFromUserGesture();
+                }
+            }, 500);
         }
     }
 
