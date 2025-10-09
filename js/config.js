@@ -18,7 +18,7 @@ export const CONFIG = {
     // Configuración de Gemini IA
     GEMINI: {
         API_KEY: 'AIzaSyCo0VMAPnglts8T0e1Ap8x7MbtdhgsFrq4', // REEMPLAZAR CON TU API KEY
-        MODEL: 'gemini-2.5-flash-lite',
+        MODEL: 'gemini-2.5-flash',
         MAX_TOKENS: 10000,
         TEMPERATURE: 0.7
     },
