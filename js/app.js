@@ -67,9 +67,13 @@ class GeminiClient {
 
     async testConnection() {
         try {
+            console.log('🔍 Probando conexión con API Key:', this.apiKey.substring(0, 10) + '...');
             const response = await this.sendDirectToGemini("Test");
+            console.log('✅ Test exitoso, respuesta:', response);
             return response.length > 0;
         } catch (error) {
+            console.error('❌ Test de conexión falló:', error);
+            console.error('📋 Detalles del error:', error.message);
             return false;
         }
     }
